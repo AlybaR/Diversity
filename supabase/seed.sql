@@ -10,9 +10,26 @@
 --   - En local avec Supabase CLI : `supabase db reset` (recharge migrations + seed)
 --   - Sur projet hosté : copier-coller dans SQL Editor de Supabase
 --
--- IMPORTANT : à exécuter avec la clé `service_role` (bypass RLS), sinon les
--- INSERT échouent puisque l'utilisateur n'est pas encore authentifié.
+-- IDEMPOTENT : peut être rejoué sans erreur grâce au TRUNCATE initial.
 -- =============================================================================
+
+-- -----------------------------------------------------------------------------
+-- Reset : vide toutes les tables (CASCADE propage aux tables dépendantes via FK)
+-- Si tu rejoues ce seed une 2e fois, tout est nettoyé proprement.
+-- -----------------------------------------------------------------------------
+TRUNCATE TABLE
+  mairies,
+  ecoles,
+  personnes,
+  contacts_mairie,
+  dossiers,
+  historique_events,
+  pieces_jointes,
+  commentaires_dossier,
+  rendez_vous,
+  messages,
+  anciens_admins
+CASCADE;
 
 -- -----------------------------------------------------------------------------
 -- MAIRIE
