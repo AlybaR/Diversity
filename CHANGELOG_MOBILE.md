@@ -5,6 +5,62 @@ Le projet web `mockups-app/` n'est jamais modifié.
 
 ---
 
+## 2026-05-19 — Étape 16 : Phase 1 backend Supabase (fondations)
+
+### Contexte
+
+Phase 1 du [plan de mise en production](../../.claude/plans/continue-le-travail-sur-humble-aurora.md) : remplacer le mockData par un vrai backend, avec la sécurité matérialisée au niveau base de données (Row Level Security PostgreSQL). Cette étape pose les **fondations côté code** ; le branchement effectif des services à Supabase se fera dans une étape suivante.
+
+Branche feature : `feat/phase1-supabase-foundations` (workflow PR obligatoire suite à la protection de `main` activée en Phase 0).
+
+### Décisions structurantes
+
+- **Hébergement** : Supabase région `eu-west-3` (Paris) — conforme RGPD.
+- **Schema** : snake_case côté SQL, conversion gérée par la couche services côté app (en Phase 1.2 à venir).
+- **IDs** : TEXT (compatibles avec les IDs lisibles du seed dev), pas UUID. Migration facile en UUID plus tard si besoin.
+- **Stockage RLS** : la sécurité est dans la base, pas dans le code. Une fonction `user_can_see_scope(scope)` réplique exactement la matrice `canRoleSeeScope` de `types/index.ts`. Bug applicatif = 0 fuite possible.
+- **Pièces jointes** : table dédiée pour les pièces de dossier (`pieces_jointes`), JSONB pour celles des RDV/messages (modèle plus léger, cohérent avec le TS actuel).
+- **Auth user link** : colonne `auth_user_id` sur `personnes` ajoutée dès la migration 0002 pour anticiper le branchement Phase 2 (magic link).
+
+### Fichiers créés
+
+- `lib/supabase.ts` : client Supabase unique, lit la config depuis `EXPO_PUBLIC_SUPABASE_URL` et `EXPO_PUBLIC_SUPABASE_ANON_KEY`. Warning explicite en dev si les vars manquent.
+- `.env.example` : template documenté pour le `.env.local` à créer côté utilisateur.
+- `supabase/migrations/0001_initial_schema.sql` : 11 tables, 9 enums, triggers `set_modifie_le`, index sur les FK + colonnes filtrées. Réplique fidèle des types TS.
+- `supabase/migrations/0002_rls_policies.sql` : 
+  - Colonne `auth_user_id UUID` sur `personnes` (lien Phase 2).
+  - Fonctions `current_user_role()`, `current_user_ecole_id()`, `user_can_see_scope()`.
+  - RLS activée sur les 11 tables.
+  - 11 policies SELECT + 4 policies INSERT/UPDATE (squelette à raffiner Phase 2).
+- `supabase/seed.sql` : données équivalentes à `data/mockData.ts` (1 mairie, 4 écoles, 5 personnes, 5 contacts mairie, 8 dossiers couvrant les 4 scopes, 3 RDV, 3 messages, historique + pièces + commentaires sélectionnés).
+- `supabase/README.md` : guide complet de prise en main (création projet, migrations, seed, vérifications, architecture de sécurité, lien auth.users ↔ personnes).
+
+### Fichiers modifiés
+
+- `package.json` : ajout de `@supabase/supabase-js` (199 packages ajoutés en tout, 4 vulnérabilités modérées non bloquantes).
+
+### Ce qui n'est PAS dans cette étape (volontairement)
+
+- **Branchement des services à Supabase** : la couche `services/*.ts` continue de lire `mockAsync(DOSSIERS)`. Le swap vers `supabase.from('dossiers').select()` se fera en Phase 1.2, une fois que l'utilisateur aura créé son projet Supabase et configuré son `.env.local`.
+- **Auth magic link** : Phase 2 dédiée.
+- **Tests RLS automatisés** (pgTAP ou scripts d'attaque) : à ajouter en fin de Phase 1.
+
+### Vérifications
+
+- ✅ `npm run typecheck` exit 0
+- ✅ `npm run lint` exit 0 (en attente du résultat)
+- ✅ `mockups-app/` intact
+- ⏳ Bundle web : à valider via la CI GitHub Actions au push
+
+### Prochaine étape
+
+Une fois cette PR mergée :
+1. **Côté utilisateur** : créer le projet Supabase (cf. `supabase/README.md`), exécuter les migrations + seed, configurer `.env.local`.
+2. **Côté code** : Phase 1.2 — brancher les services (`services/dossiers.ts`, `services/messages.ts`, etc.) à Supabase.
+3. Adapter les tests E2E Playwright pour utiliser le seed Supabase au lieu du mockData en mémoire.
+
+---
+
 ## 2026-05-19 — Étape 1 : Inspection et garde-fous
 
 ### État initial observé
