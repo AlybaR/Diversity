@@ -6,14 +6,15 @@ import { Badge } from '../../components/Badge';
 import { BottomNav } from '../../components/BottomNav';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { SecondaryButton } from '../../components/SecondaryButton';
-import { useMessage, useMessages } from '../../hooks';
+import { useMessage } from '../../hooks';
 import { canRoleSeeScope } from '../../types';
 
 export default function MessageDetailScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
   const { data: specificMessage } = useMessage(id);
-  const { data: messages = [] } = useMessages({ visibleByRole: 'parent_admin' });
-  const message = specificMessage ?? messages.find((item) => item.id === id) ?? messages[0];
+  // Pas de fallback sur messages[0] : sinon le guard d'accès plus bas serait masqué
+  // pendant le loading et un parent verrait un autre message à la place de "Accès refusé".
+  const message = specificMessage;
 
   // Garde-fou : pas de fuite si le parent n'a pas le scope du message.
   if (message && !canRoleSeeScope('parent_admin', message.visibilityScope)) {

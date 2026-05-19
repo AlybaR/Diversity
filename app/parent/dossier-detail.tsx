@@ -10,14 +10,16 @@ import { PrimaryButton } from '../../components/PrimaryButton';
 import { SecondaryButton } from '../../components/SecondaryButton';
 import { TextInputField } from '../../components/TextInputField';
 import { CATEGORIES, COMMENTAIRES_DOSSIER, PIECES_JOINTES } from '../../data/mockData';
-import { useDossier, useDossiers, useEcole, usePersonnes } from '../../hooks';
+import { useDossier, useEcole, usePersonnes } from '../../hooks';
 import { canRoleSeeScope, type CommentaireDossier } from '../../types';
 
 export default function DossierDetailScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
   const { data: specificDossier } = useDossier(id);
-  const { data: allDossiers = [] } = useDossiers({ visibleByRole: 'parent_admin' });
-  const dossier = specificDossier ?? allDossiers[0];
+  // Pas de fallback sur le premier dossier visible : sinon le guard d'accès plus bas
+  // serait masqué pendant le loading et l'utilisateur verrait un autre dossier à la place
+  // de l'écran "Accès refusé".
+  const dossier = specificDossier;
   const { data: ecole } = useEcole(dossier?.ecoleId);
   const { data: personnes = [] } = usePersonnes();
   const createur = personnes.find((p) => p.id === dossier?.createurId);
