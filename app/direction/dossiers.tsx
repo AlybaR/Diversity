@@ -105,10 +105,7 @@ export default function DirectionDossiersScreen() {
               key={dossier.id}
               dossier={dossier}
               onPress={() =>
-                router.push({
-                  pathname: '/direction/dossier-detail',
-                  params: { id: dossier.id },
-                } as Href)
+                router.push(`/direction/dossier-detail?id=${dossier.id}` as unknown as Href)
               }
             />
           ))

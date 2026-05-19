@@ -7,13 +7,9 @@ import {
   AlertTriangle,
   Building2,
   CalendarDays,
-  CheckCircle2,
-  Clock,
   FolderOpen,
   Mail,
   School,
-  TrendingDown,
-  TrendingUp,
   Users,
 } from 'lucide-react-native';
 import { GRADIENTS } from '../../constants/theme';
@@ -100,33 +96,6 @@ export default function MairieDashboardScreen() {
             {statCards.map((s) => (
               <ActivityCard key={s.label} {...s} onPress={() => router.push('/mairie/schools')} />
             ))}
-          </View>
-        </View>
-
-        {/* Section Performance ce mois — qualité (délai) + débit (dossiers traités) */}
-        <View className="mt-4">
-          <View className="flex-row items-center gap-2 mb-2">
-            <Text className="text-slate-700 text-xs font-bold uppercase tracking-wide">
-              Performance ce mois
-            </Text>
-            <View className="h-px flex-1 bg-slate-200" />
-          </View>
-          <View className="flex-row" style={{ gap: 8 }}>
-            <PerformanceCard
-              icon={<Clock color="#0d9488" size={18} />}
-              label="Délai moyen de réponse"
-              value={`${stats.delaiMoyenJours.toLocaleString('fr-FR')} j`}
-              delta={stats.deltaDelaiJours}
-              deltaUnit="j"
-              positiveWhenNegative
-            />
-            <PerformanceCard
-              icon={<CheckCircle2 color="#0d9488" size={18} />}
-              label="Dossiers traités"
-              value={String(stats.dossiersTraitesMois)}
-              delta={stats.deltaDossiersTraitesMois}
-              deltaUnit=""
-            />
           </View>
         </View>
 
@@ -239,65 +208,5 @@ function ActivityCard({
       <Text className={`${valueColor} text-2xl font-bold`}>{value}</Text>
       <Text className="text-slate-500 text-[11px] font-medium mt-0.5">{label}</Text>
     </Pressable>
-  );
-}
-
-interface PerformanceCardProps {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  delta: number;
-  deltaUnit: string;
-  // Pour le délai, une variation négative est une amélioration (on répond plus vite).
-  // Pour les dossiers traités, une variation positive est une amélioration (on traite plus).
-  positiveWhenNegative?: boolean;
-}
-
-function PerformanceCard({
-  icon,
-  label,
-  value,
-  delta,
-  deltaUnit,
-  positiveWhenNegative = false,
-}: PerformanceCardProps) {
-  const isPositive = positiveWhenNegative ? delta < 0 : delta > 0;
-  const deltaLabel = `${delta > 0 ? '+' : ''}${delta.toLocaleString('fr-FR')}${deltaUnit}`;
-  const trendColor = isPositive ? '#059669' : '#d97706';
-  const trendBg = isPositive ? '#ecfdf5' : '#fffbeb';
-  const TrendIcon = isPositive
-    ? positiveWhenNegative
-      ? TrendingDown
-      : TrendingUp
-    : positiveWhenNegative
-      ? TrendingUp
-      : TrendingDown;
-
-  return (
-    <View
-      className="flex-1 bg-white rounded-2xl p-4 border border-slate-100"
-      style={{
-        shadowColor: '#000',
-        shadowOpacity: 0.04,
-        shadowRadius: 4,
-        shadowOffset: { width: 0, height: 1 },
-        elevation: 1,
-      }}
-    >
-      <View className="flex-row items-center justify-between mb-2">
-        <View className="w-9 h-9 bg-mairie-50 rounded-xl items-center justify-center">{icon}</View>
-        <View
-          className="flex-row items-center gap-1 rounded-full px-2 py-1"
-          style={{ backgroundColor: trendBg }}
-        >
-          <TrendIcon color={trendColor} size={12} />
-          <Text className="text-[10px] font-bold" style={{ color: trendColor }}>
-            {deltaLabel}
-          </Text>
-        </View>
-      </View>
-      <Text className="text-slate-800 text-2xl font-bold">{value}</Text>
-      <Text className="text-slate-500 text-[11px] mt-1 leading-snug">{label}</Text>
-    </View>
   );
 }

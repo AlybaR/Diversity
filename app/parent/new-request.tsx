@@ -8,9 +8,8 @@ import { TextInputField } from '../../components/TextInputField';
 import { SelectField, type SelectOption } from '../../components/SelectField';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { SecondaryButton } from '../../components/SecondaryButton';
-import { ScopeSelector } from '../../components/ScopeSelector';
 import { CATEGORIES, URGENCES } from '../../data/mockData';
-import type { Categorie, Urgence, VisibilityScope } from '../../types';
+import type { Categorie, Urgence } from '../../types';
 
 const CATEGORIE_OPTIONS: SelectOption<Categorie>[] = CATEGORIES.map((c) => ({
   value: c.value,
@@ -49,9 +48,6 @@ export default function NewRequestScreen() {
   const [description, setDescription] = useState('');
   const [urgence, setUrgence] = useState<Urgence>('moyenne');
   const [nbPieces, setNbPieces] = useState(0);
-  // Par défaut, on met en visibilité tripartite (sujet partagé) : le parent doit
-  // explicitement choisir 'parents_mairie' pour exclure la direction.
-  const [scope, setScope] = useState<VisibilityScope>('partage_tripartite');
   const [submitted, setSubmitted] = useState(false);
 
   const isValid = categorie !== null && titre.trim().length >= 5 && description.trim().length >= 10;
@@ -87,11 +83,7 @@ export default function NewRequestScreen() {
       );
       return;
     }
-    const scopeMessage =
-      scope === 'parents_mairie'
-        ? "Visible uniquement par la mairie et les parents élus de l'école."
-        : 'Visible par la mairie, les parents élus et la direction.';
-    Alert.alert('Demande transmise', `La mairie a bien reçu votre demande. ${scopeMessage}`, [
+    Alert.alert('Demande transmise', 'La mairie a bien reçu votre demande.', [
       { text: 'OK', onPress: () => router.replace('/parent/dossiers') },
     ]);
   };
@@ -189,8 +181,6 @@ export default function NewRequestScreen() {
               {URGENCE_LABELS[urgence]}
             </Text>
           </View>
-
-          <ScopeSelector role="parent_admin" value={scope} onChange={setScope} />
 
           <View>
             <Text className="text-sm font-semibold text-slate-700 mb-2">

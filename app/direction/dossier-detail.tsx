@@ -10,7 +10,7 @@ import { SecondaryButton } from '../../components/SecondaryButton';
 import { TextInputField } from '../../components/TextInputField';
 import { CATEGORIES, COMMENTAIRES_DOSSIER, PERSONNES, PIECES_JOINTES } from '../../data/mockData';
 import { useDossier, useEcole, usePersonnes } from '../../hooks';
-import { canRoleSeeScope, scopeShortLabel, type CommentaireDossier } from '../../types';
+import { canRoleSeeScope, type CommentaireDossier } from '../../types';
 
 const DIRECTION = PERSONNES.find((p) => p.role === 'direction');
 
@@ -98,7 +98,6 @@ export default function DirectionDossierDetailScreen() {
             <Badge label={categorie?.label ?? ''} tone="slate" />
             <StatutBadge statut={dossier.statut} />
             <UrgenceBadge urgence={dossier.urgence} />
-            <Badge label={scopeShortLabel(dossier.visibilityScope)} tone="indigo" />
           </View>
           <Text className="text-slate-600 text-sm leading-relaxed">{dossier.description}</Text>
         </View>

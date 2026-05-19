@@ -11,7 +11,7 @@ import { SecondaryButton } from '../../components/SecondaryButton';
 import { TextInputField } from '../../components/TextInputField';
 import { CATEGORIES, COMMENTAIRES_DOSSIER, PIECES_JOINTES } from '../../data/mockData';
 import { useDossier, useDossiers, useEcole, usePersonnes } from '../../hooks';
-import { canRoleSeeScope, scopeShortLabel, type CommentaireDossier } from '../../types';
+import { canRoleSeeScope, type CommentaireDossier } from '../../types';
 
 export default function DossierDetailScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
@@ -100,7 +100,6 @@ export default function DossierDetailScreen() {
             <Badge label={categorie?.label ?? ''} tone="slate" />
             <StatutBadge statut={dossier.statut} />
             <UrgenceBadge urgence={dossier.urgence} />
-            <Badge label={scopeShortLabel(dossier.visibilityScope)} tone="indigo" />
           </View>
           <Text className="text-slate-600 text-sm leading-relaxed">{dossier.description}</Text>
         </View>

@@ -9,9 +9,8 @@ import { PrimaryButton } from '../../components/PrimaryButton';
 import { SecondaryButton } from '../../components/SecondaryButton';
 import { SelectField, type SelectOption } from '../../components/SelectField';
 import { TextInputField } from '../../components/TextInputField';
-import { ScopeSelector } from '../../components/ScopeSelector';
 import { CATEGORIES, ECOLES, PERSONNES } from '../../data/mockData';
-import type { Categorie, Urgence, VisibilityScope } from '../../types';
+import type { Categorie, Urgence } from '../../types';
 
 const DIRECTION = PERSONNES.find((p) => p.role === 'direction');
 const ECOLE_DIRECTION = ECOLES.find((e) => e.id === DIRECTION?.ecoleId) ?? ECOLES[0];
@@ -23,17 +22,10 @@ const URGENCES: { value: Urgence; label: string; tone: string; activeBg: string 
 ];
 
 export default function DirectionNewRequestScreen() {
-  // La direction choisit entre :
-  // - direction_mairie  → privé avec la mairie (tensions, arbitrages, alertes internes)
-  // - partage_tripartite → partagé avec parents + mairie (travaux, sécurité, info officielle)
-  // Aucun autre scope n'est exposé (cf. ScopeSelector OPTIONS_BY_ROLE.direction).
   const [titre, setTitre] = useState('');
   const [description, setDescription] = useState('');
   const [categorie, setCategorie] = useState<Categorie | null>(null);
   const [urgence, setUrgence] = useState<Urgence>('moyenne');
-  // Par défaut : direction_mairie (canal privé avec la mairie) — la direction
-  // doit explicitement choisir 'partage_tripartite' pour inclure les parents.
-  const [scope, setScope] = useState<VisibilityScope>('direction_mairie');
 
   const categorieOptions = useMemo<SelectOption<Categorie>[]>(
     () => CATEGORIES.map((c) => ({ value: c.value, label: c.label })),
@@ -49,11 +41,7 @@ export default function DirectionNewRequestScreen() {
       Alert.alert('Sujet incomplet', `Merci d'ajouter ${missing.join(', ')}.`);
       return;
     }
-    const scopeMessage =
-      scope === 'direction_mairie'
-        ? 'Visible uniquement par la mairie. Les représentants des parents ne verront pas ce sujet.'
-        : "Visible par la mairie, les parents élus et la direction de l'école.";
-    Alert.alert('Sujet transmis', `Le sujet a été transmis à la mairie. ${scopeMessage}`, [
+    Alert.alert('Sujet transmis', 'Le sujet a été transmis à la mairie.', [
       { text: 'OK', onPress: () => router.replace('/direction/dossiers' as Href) },
     ]);
   };
@@ -67,11 +55,11 @@ export default function DirectionNewRequestScreen() {
             <ShieldCheck color="#4f46e5" size={20} />
             <View className="flex-1">
               <Text className="text-direction-700 font-semibold text-sm">
-                Choix de visibilité explicite
+                Sujet transmis à la mairie
               </Text>
               <Text className="text-direction-600 text-xs leading-relaxed mt-1">
-                Choisissez avec qui ce sujet est partagé. Un sujet « Direction + mairie » reste
-                strictement privé entre vous et la mairie — les parents élus ne le voient pas.
+                Décrivez le besoin de façon factuelle : la mairie pourra ensuite le traiter avec le
+                bon service et revenir vers vous.
               </Text>
             </View>
           </View>
@@ -93,8 +81,6 @@ export default function DirectionNewRequestScreen() {
             placeholder="Choisir une catégorie..."
             maxHeight={220}
           />
-
-          <ScopeSelector role="direction" value={scope} onChange={setScope} />
 
           <View>
             <Text className="text-sm font-semibold text-slate-700 mb-2">Urgence</Text>

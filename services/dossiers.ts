@@ -1,6 +1,6 @@
 import type { Dossier, Role, StatutDossier, VisibilityScope } from '../types';
 import { canRoleSeeScope } from '../types';
-import { DOSSIERS } from '../data/mockData';
+import { DOSSIERS, DOSSIERS_TEST_VISIBILITE } from '../data/mockData';
 import { mockAsync } from './_config';
 
 export interface DossierFilter {
@@ -50,6 +50,7 @@ export function listDossiers(filter: DossierFilter = {}): Promise<Dossier[]> {
 }
 
 export function getDossierById(id: string): Promise<Dossier | null> {
-  const dossier = DOSSIERS.find((d) => d.id === id) ?? null;
+  const dossier =
+    DOSSIERS.find((d) => d.id === id) ?? DOSSIERS_TEST_VISIBILITE.find((d) => d.id === id) ?? null;
   return mockAsync(dossier);
 }

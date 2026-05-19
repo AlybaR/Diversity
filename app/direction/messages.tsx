@@ -26,12 +26,7 @@ export default function DirectionMessagesScreen() {
             <MessageCard
               key={m.id}
               message={m}
-              onPress={() =>
-                router.push({
-                  pathname: '/direction/message-detail',
-                  params: { id: m.id },
-                } as Href)
-              }
+              onPress={() => router.push(`/direction/message-detail?id=${m.id}` as unknown as Href)}
             />
           ))
         )}

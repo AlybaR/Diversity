@@ -14,7 +14,7 @@ import { Badge } from '../../components/Badge';
 import { StatutBadge, UrgenceBadge } from '../../components/StatusBadge';
 import { STATUTS_DOSSIER } from '../../data/mockData';
 import { useDossier, useDossiers } from '../../hooks';
-import { scopeShortLabel, type StatutDossier, type VisibilityScope } from '../../types';
+import type { StatutDossier } from '../../types';
 
 type Service =
   | 'voirie'
@@ -72,14 +72,6 @@ export default function MairieReplyScreen() {
   const [actionPrevue, setActionPrevue] = useState('');
   const [proposerRdv, setProposerRdv] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  // Scope local pour simuler le workflow de partage (mock — sans persistance backend).
-  const [currentScope, setCurrentScope] = useState<VisibilityScope | null>(null);
-
-  const effectiveScope: VisibilityScope =
-    currentScope ?? dossier?.visibilityScope ?? 'parents_mairie';
-  // On peut proposer le partage uniquement pour les dossiers privés (pas pour ceux déjà tripartites).
-  const canProposeShare =
-    effectiveScope === 'parents_mairie' || effectiveScope === 'direction_mairie';
 
   const isValid =
     reponse.trim().length >= 10 && nouveauStatut !== null && service !== null && delai !== null;
@@ -100,35 +92,8 @@ export default function MairieReplyScreen() {
     }
     Alert.alert(
       'Réponse envoyée',
-      `Les représentants de l'école seront notifiés${proposerRdv ? ' et une proposition de rendez-vous leur sera transmise' : ''}.`,
+      `La réponse sera publiée dans le dossier${proposerRdv ? ' avec une proposition de rendez-vous' : ''}.`,
       [{ text: 'OK', onPress: () => router.replace('/mairie/dashboard') }],
-    );
-  };
-
-  // Workflow de partage : la mairie propose au créateur du dossier de l'élargir
-  // au canal tripartite (cas 3 du briefing produit). Validation requise par le créateur.
-  // Choix retenu : « tout l'historique est partagé dès le partage » (option utilisateur).
-  const proposeShare = () => {
-    if (!canProposeShare) return;
-    const targetParty = effectiveScope === 'parents_mairie' ? 'la direction' : 'les parents élus';
-    const creatorParty =
-      effectiveScope === 'parents_mairie' ? 'au parent administrateur' : 'à la direction';
-    Alert.alert(
-      'Proposer le partage',
-      `Une demande de partage avec ${targetParty} sera envoyée ${creatorParty}. Si la proposition est acceptée, tout l'historique de ce dossier deviendra visible par ${targetParty} (commentaires et pièces jointes inclus).`,
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Envoyer la proposition',
-          onPress: () => {
-            setCurrentScope('partage_tripartite');
-            Alert.alert(
-              'Proposition envoyée',
-              `${creatorParty.charAt(0).toUpperCase() + creatorParty.slice(1)} va valider ou refuser. L'historique du dossier conservera la trace de ce changement.`,
-            );
-          },
-        },
-      ],
     );
   };
 
@@ -171,7 +136,6 @@ export default function MairieReplyScreen() {
             />
             <StatutBadge statut={dossier.statut} />
             <UrgenceBadge urgence={dossier.urgence} />
-            <Badge label={scopeShortLabel(effectiveScope)} tone="indigo" />
           </View>
           <Text className="text-slate-600 text-xs leading-relaxed" numberOfLines={3}>
             {dossier.description}
@@ -255,40 +219,6 @@ export default function MairieReplyScreen() {
             </View>
           </View>
         </View>
-
-        {canProposeShare && (
-          <View className="mt-5 bg-white rounded-2xl p-4 border border-direction-100">
-            <Text className="text-direction-700 font-semibold text-sm mb-1">
-              Proposer le partage avec{' '}
-              {effectiveScope === 'parents_mairie' ? 'la direction' : 'les parents'}
-            </Text>
-            <Text className="text-slate-500 text-xs leading-relaxed mb-3">
-              Ce dossier est actuellement privé entre vous et le créateur. Vous pouvez proposer de
-              l'élargir au canal tripartite. Le créateur devra valider la proposition.
-            </Text>
-            <Pressable
-              onPress={proposeShare}
-              className="bg-direction-50 border border-direction-200 rounded-xl py-2.5 px-4 self-start"
-              style={({ pressed }) => ({ opacity: pressed ? 0.86 : 1 })}
-            >
-              <Text className="text-direction-700 text-xs font-bold">
-                Proposer le partage tripartite
-              </Text>
-            </Pressable>
-          </View>
-        )}
-
-        {effectiveScope === 'partage_tripartite' && currentScope === 'partage_tripartite' && (
-          <View className="mt-5 bg-success-50 rounded-2xl p-4 border border-success-100">
-            <Text className="text-success-600 font-semibold text-sm">
-              Proposition de partage envoyée
-            </Text>
-            <Text className="text-slate-600 text-xs leading-relaxed mt-1">
-              En attente de validation du créateur. Une fois validée, l'historique complet sera
-              visible par toutes les parties.
-            </Text>
-          </View>
-        )}
 
         <View className="mt-6">
           <PrimaryButton

@@ -403,9 +403,12 @@ export const DOSSIERS: Dossier[] = [
     ],
     visibilityScope: 'partage_tripartite',
   },
-  // ============================================================================
-  // Dossiers illustrant les canaux privés — démontrent l'isolation par scope.
-  // ============================================================================
+];
+
+// Fixtures de test pour les scripts d'isolation des rôles.
+// Elles ne sont pas listées dans les parcours visibles, mais restent accessibles
+// via getDossierById pour vérifier les guards d'URL directe.
+export const DOSSIERS_TEST_VISIBILITE: Dossier[] = [
   {
     // Canal PARENTS_MAIRIE — invisible direction.
     // Cas 1 du briefing utilisateur : « difficulté de communication avec la direction ».
@@ -647,6 +650,9 @@ export const RENDEZ_VOUS: RendezVous[] = [
     statut: 'demande',
     visibilityScope: 'parents_mairie',
   },
+];
+
+export const RENDEZ_VOUS_TEST_VISIBILITE: RendezVous[] = [
   {
     // RDV privé direction ↔ mairie sur le dossier de tensions parents.
     id: 'rdv-tensions',
@@ -767,7 +773,12 @@ export const STATS_PARENT = {
   ).length,
   dossiersArchives: 28,
   rdvRealises: 6,
-  messagesMairie: MESSAGES.length + 10,
+  messagesMairie:
+    MESSAGES.filter(
+      (message) =>
+        message.visibilityScope === 'parents_mairie' ||
+        message.visibilityScope === 'partage_tripartite',
+    ).length + 10,
 };
 
 export const STATS_MAIRIE = {
@@ -781,7 +792,7 @@ export const STATS_MAIRIE = {
   dossiersUrgents:
     DOSSIERS.filter((d) => d.urgence === 'elevee' && d.statut !== 'resolu').length + 2,
   ecolesASurveiller: 2,
-  // Performance ce mois — alimentent la section "Performance" du dashboard mairie.
+  // Valeurs conservées pour de futurs tests de pilotage, non affichées dans le dashboard MVP.
   // delaiMoyenJours : moyenne du temps de première réponse mairie sur les dossiers traités ce mois.
   // deltaDelaiJours : variation par rapport au mois précédent (négatif = amélioration).
   // dossiersTraitesMois : nombre de dossiers passés à un statut "résolu" ou "classé sans suite" ce mois.

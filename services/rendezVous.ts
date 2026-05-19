@@ -1,6 +1,6 @@
 import type { RendezVous, Role, StatutRDV, VisibilityScope } from '../types';
 import { canRoleSeeScope } from '../types';
-import { RENDEZ_VOUS } from '../data/mockData';
+import { RENDEZ_VOUS, RENDEZ_VOUS_TEST_VISIBILITE } from '../data/mockData';
 import { mockAsync } from './_config';
 
 export interface RdvFilter {
@@ -27,6 +27,9 @@ export function listRendezVous(filter: RdvFilter = {}): Promise<RendezVous[]> {
 }
 
 export function getRendezVousById(id: string): Promise<RendezVous | null> {
-  const rdv = RENDEZ_VOUS.find((r) => r.id === id) ?? null;
+  const rdv =
+    RENDEZ_VOUS.find((r) => r.id === id) ??
+    RENDEZ_VOUS_TEST_VISIBILITE.find((r) => r.id === id) ??
+    null;
   return mockAsync(rdv);
 }

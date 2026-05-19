@@ -7,7 +7,7 @@ import { BottomNav } from '../../components/BottomNav';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { SecondaryButton } from '../../components/SecondaryButton';
 import { useMessage, useMessages } from '../../hooks';
-import { canRoleSeeScope, scopeShortLabel } from '../../types';
+import { canRoleSeeScope } from '../../types';
 
 export default function DirectionMessageDetailScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
@@ -63,18 +63,6 @@ export default function DirectionMessageDetailScreen() {
           )}
 
           <Text className="text-slate-700 text-sm leading-relaxed">{message.contenu}</Text>
-        </View>
-
-        <View className="bg-white rounded-2xl p-4 border border-slate-100 mb-3">
-          <View className="flex-row items-center justify-between gap-2 mb-2">
-            <Text className="text-slate-700 font-bold text-sm">Visibilité</Text>
-            <Badge label={scopeShortLabel(message.visibilityScope)} tone="indigo" />
-          </View>
-          <Text className="text-slate-500 text-xs leading-relaxed">
-            {message.visibilityScope === 'direction_mairie'
-              ? 'Message échangé uniquement entre la direction et la mairie.'
-              : 'Message partagé entre parents, direction et mairie.'}
-          </Text>
         </View>
 
         {message.piecesJointes && message.piecesJointes.length > 0 && (
