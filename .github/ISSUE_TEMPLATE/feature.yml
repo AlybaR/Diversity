@@ -1,0 +1,34 @@
+name: ✨ Évolution
+description: Proposer une nouvelle fonctionnalité ou une amélioration
+labels: ['enhancement']
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problème à résoudre
+      description: Quel besoin n'est pas couvert aujourd'hui ?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposition
+      description: Comment imagines-tu la solution ?
+    validations:
+      required: true
+  - type: dropdown
+    id: role
+    attributes:
+      label: Rôle utilisateur principal concerné
+      options:
+        - Parent élu
+        - Mairie
+        - Direction d'école
+        - Plusieurs / transverse
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives envisagées
+      description: As-tu pensé à d'autres solutions ? Pourquoi celle-ci est mieux ?

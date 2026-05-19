@@ -1,0 +1,68 @@
+name: 🐛 Bug
+description: Signaler un dysfonctionnement de l'app
+labels: ['bug']
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description du bug
+      description: Que s'est-il passé ?
+      placeholder: Décris ce que tu as observé.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Étapes pour reproduire
+      placeholder: |
+        1. Je vais sur '...'
+        2. Je clique sur '...'
+        3. Je vois '...'
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Comportement attendu
+      placeholder: Ce qui devrait se passer normalement.
+    validations:
+      required: true
+  - type: dropdown
+    id: role
+    attributes:
+      label: Rôle utilisateur
+      options:
+        - Parent élu
+        - Mairie
+        - Direction d'école
+        - Non connecté
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Plateforme
+      options:
+        - Web (Chrome)
+        - Web (Safari)
+        - Web (Firefox)
+        - iOS
+        - Android
+    validations:
+      required: true
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Captures d'écran
+      description: Glisse-dépose ici si possible.
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Gravité
+      options:
+        - 🔴 Critique (perte de données, fuite d'info, app cassée)
+        - 🟠 Important (fonctionnalité majeure bloquée)
+        - 🟡 Moyen (gêne mais contournable)
+        - 🟢 Mineur (cosmétique)
+    validations:
+      required: true

@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Annule les anciens runs si on push plusieurs fois rapidement
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Quality (typecheck + lint + bundle)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        # --legacy-peer-deps obligatoire (conflit react-dom / expo-router connu)
+        run: npm install --legacy-peer-deps
+
+      - name: TypeScript typecheck
+        run: npm run typecheck
+
+      - name: ESLint
+        run: npm run lint
+
+      - name: Bundle web check (Metro)
+        # Vérifie que l'app se bundle en entier — couvre les erreurs de configuration
+        # NativeWind/Reanimated/Babel que TypeScript seul ne détecte pas.
+        run: npm run bundle:check
+        env:
+          EXPO_OFFLINE: '1'
+          CI: '1'

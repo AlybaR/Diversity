@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 🔐 Faille de sécurité
+    url: mailto:kouceila.moussaoui@ifjrpc.org
+    about: Ne PAS créer d'issue publique pour une faille. Envoie un email direct, on traite sous 48h.
