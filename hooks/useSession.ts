@@ -18,6 +18,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Session, User } from '@supabase/supabase-js';
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { clearUser, setUser } from '../lib/sentry';
 import { findPersonneByAuthUserId } from '../services/supabase/authLink';
 import type { Personne, Role } from '../types';
 
@@ -72,6 +73,7 @@ export function useSession(): UseSessionResult {
 
   const signOut = async () => {
     await supabase.auth.signOut();
+    clearUser();
     // Flush tout le cache React Query (anciennes données pour l'ancien rôle)
     queryClient.clear();
   };
@@ -80,6 +82,13 @@ export function useSession(): UseSessionResult {
   const personne = personneQuery.data ?? null;
   const role: Role | null = personne?.role ?? null;
   const isAuthorized = !!session && !!personne;
+
+  // Synchronise l'identité avec Sentry (no-op tant que le DSN n'est pas configuré)
+  useEffect(() => {
+    if (isAuthorized && personne) {
+      setUser({ id: personne.id, email: personne.email, role: personne.role });
+    }
+  }, [isAuthorized, personne]);
 
   return {
     session,

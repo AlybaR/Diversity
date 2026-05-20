@@ -16,6 +16,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 import { router, type Href } from 'expo-router';
 import { supabase } from '../../lib/supabase';
+import { addBreadcrumb, captureException, captureMessage } from '../../lib/sentry';
 import type { Role } from '../../types';
 
 function redirectFromRole(role: Role): Href {
@@ -65,7 +66,14 @@ export default function AuthCallbackScreen() {
         });
       }
 
+      addBreadcrumb({
+        category: 'auth.callback',
+        message: 'session fetched',
+        data: { hasSession: !!session, email: session?.user.email },
+      });
+
       if (!session) {
+        captureMessage('auth.callback: no session', 'warning');
         gotoNoAccess('no-session', sessionError?.message);
         return;
       }
@@ -80,6 +88,11 @@ export default function AuthCallbackScreen() {
       }
 
       if (error) {
+        captureException(new Error(`RPC link_current_user_to_personne failed: ${error.message}`), {
+          tags: { phase: 'auth.callback', step: 'rpc' },
+          extra: { code: (error as { code?: string }).code },
+          level: 'error',
+        });
         gotoNoAccess('rpc-error', error.message);
         return;
       }
@@ -94,9 +107,19 @@ export default function AuthCallbackScreen() {
       }
 
       if (!linked) {
+        captureMessage(
+          `auth.callback: email-not-found for ${session.user.email ?? '<unknown>'}`,
+          'warning',
+        );
         gotoNoAccess('email-not-found', `Aucune personne ne correspond à ${session.user.email}`);
         return;
       }
+
+      addBreadcrumb({
+        category: 'auth.callback',
+        message: 'linked',
+        data: { personne_id: linked.personne_id, role: linked.personne_role },
+      });
 
       // 3. Redirection selon le rôle
       router.replace(redirectFromRole(linked.personne_role));

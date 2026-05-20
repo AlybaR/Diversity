@@ -13,6 +13,7 @@ import {
 import { GRADIENTS } from '../../constants/theme';
 import { BottomNav } from '../../components/BottomNav';
 import { Badge } from '../../components/Badge';
+import { ErrorBanner } from '../../components/ErrorBanner';
 import { ECOLES, PERSONNES } from '../../data/mockData';
 import { useDossiers, useMessages, useRendezVous } from '../../hooks';
 
@@ -23,12 +24,13 @@ export default function DirectionHomeScreen() {
   const insets = useSafeAreaInsets();
   // La direction ne voit que les dossiers/messages/RDV dont le scope l'autorise.
   // Source : matrice canRoleSeeScope (direction voit 'direction_mairie' + 'partage_tripartite').
-  const { data: dossiers = [] } = useDossiers({
+  const { data: dossiers = [], error: dossiersError } = useDossiers({
     ecoleId: ECOLE_DIRECTION.id,
     visibleByRole: 'direction',
   });
-  const { data: messages = [] } = useMessages({ visibleByRole: 'direction' });
-  const { data: rdvs = [] } = useRendezVous({ visibleByRole: 'direction' });
+  const { data: messages = [], error: messagesError } = useMessages({ visibleByRole: 'direction' });
+  const { data: rdvs = [], error: rdvsError } = useRendezVous({ visibleByRole: 'direction' });
+  const error = dossiersError || messagesError || rdvsError;
 
   const directionNom = DIRECTION ? `${DIRECTION.prenom} ${DIRECTION.nom}` : 'Direction';
   const initials = DIRECTION
@@ -93,6 +95,13 @@ export default function DirectionHomeScreen() {
         contentContainerStyle={{ padding: 16, paddingBottom: 140 }}
         showsVerticalScrollIndicator={false}
       >
+        {error && (
+          <ErrorBanner
+            message={`Certaines données n’ont pas pu être chargées (${error.message}).`}
+            className="mb-3"
+          />
+        )}
+
         {/* Bandeau de confidentialité — rassure la direction sur l'isolation */}
         <View
           className="rounded-2xl p-4 mb-3 flex-row items-start gap-3 border"

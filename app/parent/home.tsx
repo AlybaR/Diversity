@@ -20,11 +20,14 @@ import Animated, {
   withTiming,
   Easing,
 } from 'react-native-reanimated';
-import { GRADIENTS } from '../../constants/theme';
+import { COLORS, GRADIENTS } from '../../constants/theme';
 import { UTILISATEUR_COURANT } from '../../data/mockData';
 import { useEcoles, useMessages, useRendezVous, useStatsParent } from '../../hooks';
 import { BottomNav } from '../../components/BottomNav';
 import { Badge } from '../../components/Badge';
+import { EmptyState } from '../../components/EmptyState';
+import { ErrorBanner } from '../../components/ErrorBanner';
+import { LoadingState } from '../../components/LoadingState';
 
 function PulseNumber({
   value,
@@ -54,21 +57,52 @@ function PulseNumber({
 export default function ParentHomeScreen() {
   const insets = useSafeAreaInsets();
   // Données via hooks React Query (cache partagé entre écrans, prêt pour backend)
-  const { data: ecoles } = useEcoles();
-  const { data: messages } = useMessages({ visibleByRole: 'parent_admin' });
-  const { data: rdvs } = useRendezVous({ visibleByRole: 'parent_admin' });
+  const { data: ecoles, isLoading: ecolesLoading, error: ecolesError } = useEcoles();
+  const {
+    data: messages,
+    isLoading: messagesLoading,
+    error: messagesError,
+  } = useMessages({ visibleByRole: 'parent_admin' });
+  const {
+    data: rdvs,
+    isLoading: rdvsLoading,
+    error: rdvsError,
+  } = useRendezVous({ visibleByRole: 'parent_admin' });
   const ecole = ecoles?.[0];
-  const { data: stats } = useStatsParent(ecole?.id ?? '');
+  const {
+    data: stats,
+    isLoading: statsLoading,
+    error: statsError,
+  } = useStatsParent(ecole?.id ?? '');
   const dernierMessage = messages?.[0];
   const prochainRdv = rdvs?.[0];
   const initials =
     `${UTILISATEUR_COURANT.prenom.charAt(0)}${UTILISATEUR_COURANT.nom.charAt(0)}`.toUpperCase();
 
-  // Pendant le premier render (sans cache chaud), retourner un fallback minimal
-  if (!ecole || !stats || !dernierMessage || !prochainRdv) {
+  const isLoading = ecolesLoading || messagesLoading || rdvsLoading || statsLoading;
+  // On agrège les erreurs en un seul ErrorBanner (premier non-null gagne)
+  const error = ecolesError || messagesError || rdvsError || statsError;
+
+  // Pendant le premier load (sans cache chaud), spinner plein écran. Une fois qu'on
+  // a au moins l'école et les stats, on rend l'écran complet (les sections vides
+  // affichent leur propre EmptyState).
+  if (isLoading && !ecole) {
     return (
-      <View className="flex-1 bg-slate-50 items-center justify-center">
-        <Text className="text-slate-400 text-sm">Chargement…</Text>
+      <View className="flex-1 bg-slate-50">
+        <LoadingState label="Chargement de l’accueil…" />
+      </View>
+    );
+  }
+
+  if (!ecole || !stats) {
+    return (
+      <View className="flex-1 bg-slate-50 p-4 justify-center">
+        <ErrorBanner
+          title="Données indisponibles"
+          message={
+            error?.message ?? 'Aucune école rattachée à votre compte. Contactez votre mairie.'
+          }
+        />
       </View>
     );
   }
@@ -113,6 +147,13 @@ export default function ParentHomeScreen() {
         contentContainerStyle={{ padding: 16, paddingBottom: 140 }}
         showsVerticalScrollIndicator={false}
       >
+        {error && (
+          <ErrorBanner
+            message={`Certaines sections ont échoué à se charger (${error.message}).`}
+            className="mb-3"
+          />
+        )}
+
         {/* Alerte */}
         <View
           className="rounded-2xl p-4 mb-3 flex-row items-start gap-3 border"
@@ -195,23 +236,32 @@ export default function ParentHomeScreen() {
             </View>
             <Text className="font-bold text-sm text-slate-800">Dernier message mairie</Text>
           </View>
-          <View
-            className="rounded-xl p-3.5 border"
-            style={{ backgroundColor: '#eef2ff', borderColor: '#e0e7ff' }}
-          >
-            <Text className="text-sm font-semibold text-slate-800 mb-1">
-              {dernierMessage.titre}
-            </Text>
-            <Text className="text-xs text-slate-500 mb-3">
-              {dernierMessage.date} · {dernierMessage.expediteur}
-            </Text>
-            <Pressable
-              onPress={() => router.push('/parent/messages')}
-              className="bg-white px-3 py-1.5 rounded-lg border border-primary-100 self-start"
+          {dernierMessage ? (
+            <View
+              className="rounded-xl p-3.5 border"
+              style={{ backgroundColor: '#eef2ff', borderColor: '#e0e7ff' }}
             >
-              <Text className="text-xs font-semibold text-primary-600">Lire</Text>
-            </Pressable>
-          </View>
+              <Text className="text-sm font-semibold text-slate-800 mb-1">
+                {dernierMessage.titre}
+              </Text>
+              <Text className="text-xs text-slate-500 mb-3">
+                {dernierMessage.date} · {dernierMessage.expediteur}
+              </Text>
+              <Pressable
+                onPress={() => router.push('/parent/messages')}
+                className="bg-white px-3 py-1.5 rounded-lg border border-primary-100 self-start"
+              >
+                <Text className="text-xs font-semibold text-primary-600">Lire</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <EmptyState
+              icon={<MessageSquare color={COLORS.slate[400]} size={24} />}
+              title="Aucun message"
+              subtitle="La mairie n’a pas encore écrit. Vous serez notifié dès qu’un message arrive."
+              className="py-6"
+            />
+          )}
         </View>
 
         {/* Prochain rendez-vous */}
@@ -231,23 +281,33 @@ export default function ParentHomeScreen() {
             </View>
             <Text className="font-bold text-sm text-slate-800">Prochain rendez-vous</Text>
           </View>
-          <View
-            className="rounded-xl p-3.5 border border-success-100"
-            style={{ backgroundColor: '#ecfdf5' }}
-          >
-            <Text className="text-sm font-semibold text-slate-800 mb-2">{prochainRdv.titre}</Text>
-            <View className="flex-row flex-wrap gap-2 mb-3">
-              <Badge label={`📅 ${prochainRdv.date}`} tone="emerald" />
-              <Badge label={`🕕 ${prochainRdv.heure}`} tone="emerald" />
-              <Badge label={`📍 ${prochainRdv.lieu}`} tone="emerald" />
-            </View>
-            <Pressable
-              onPress={() => router.push('/parent/appointments')}
-              className="bg-white px-3 py-1.5 rounded-lg border border-success-100 self-start"
+          {prochainRdv ? (
+            <View
+              className="rounded-xl p-3.5 border border-success-100"
+              style={{ backgroundColor: '#ecfdf5' }}
             >
-              <Text className="text-xs font-semibold text-success-600">Voir le rendez-vous</Text>
-            </Pressable>
-          </View>
+              <Text className="text-sm font-semibold text-slate-800 mb-2">{prochainRdv.titre}</Text>
+              <View className="flex-row flex-wrap gap-2 mb-3">
+                <Badge label={`📅 ${prochainRdv.date}`} tone="emerald" />
+                <Badge label={`🕕 ${prochainRdv.heure}`} tone="emerald" />
+                <Badge label={`📍 ${prochainRdv.lieu}`} tone="emerald" />
+              </View>
+              <Pressable
+                onPress={() => router.push('/parent/appointments')}
+                className="bg-white px-3 py-1.5 rounded-lg border border-success-100 self-start"
+              >
+                <Text className="text-xs font-semibold text-success-600">Voir le rendez-vous</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <EmptyState
+              icon={<CalendarDays color={COLORS.slate[400]} size={24} />}
+              title="Aucun rendez-vous planifié"
+              subtitle="Vous pouvez en proposer un à la mairie depuis l’onglet Rendez-vous."
+              cta={{ label: 'Proposer un RDV', onPress: () => router.push('/parent/appointments') }}
+              className="py-6"
+            />
+          )}
         </View>
 
         {/* Historique rapide */}

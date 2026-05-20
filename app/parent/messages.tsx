@@ -1,17 +1,26 @@
 import { useState } from 'react';
 import { Alert, Modal, Pressable, ScrollView, Text, View } from 'react-native';
 import { router } from 'expo-router';
-import { MailPlus, Send, X } from 'lucide-react-native';
+import { MailPlus, MessageSquare, Send, X } from 'lucide-react-native';
 import { AppHeader } from '../../components/AppHeader';
 import { BottomNav } from '../../components/BottomNav';
+import { EmptyState } from '../../components/EmptyState';
+import { ErrorBanner } from '../../components/ErrorBanner';
+import { LoadingState } from '../../components/LoadingState';
 import { MessageCard } from '../../components/MessageCard';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { SecondaryButton } from '../../components/SecondaryButton';
 import { TextInputField } from '../../components/TextInputField';
+import { COLORS } from '../../constants/theme';
 import { useMessages } from '../../hooks';
 
 export default function MessagesScreen() {
-  const { data: messages = [] } = useMessages({ visibleByRole: 'parent_admin' });
+  const {
+    data: messages = [],
+    isLoading,
+    error,
+    refetch,
+  } = useMessages({ visibleByRole: 'parent_admin' });
   const [composerOpen, setComposerOpen] = useState(false);
   const [titre, setTitre] = useState('');
   const [contenu, setContenu] = useState('');
@@ -49,17 +58,40 @@ export default function MessagesScreen() {
           />
         </View>
 
-        {messages.map((m) => (
-          <MessageCard
-            key={m.id}
-            message={m}
-            onPress={() => router.push({ pathname: './message-detail', params: { id: m.id } })}
+        {error && (
+          <ErrorBanner
+            message={`Impossible de charger les messages (${error.message}).`}
+            onRetry={() => refetch()}
+            className="mb-3"
           />
-        ))}
-        <Text className="text-slate-400 text-xs text-center mt-4">
-          Les messages de la mairie sont diffusés à l'ensemble des représentants élus de votre
-          école.
-        </Text>
+        )}
+
+        {isLoading ? (
+          <LoadingState label="Chargement des messages…" />
+        ) : messages.length === 0 ? (
+          <View className="bg-white rounded-2xl border border-slate-100">
+            <EmptyState
+              icon={<MessageSquare color={COLORS.slate[400]} size={28} />}
+              title="Aucun message"
+              subtitle="La mairie n’a pas encore écrit. Vous pouvez initier la conversation."
+              cta={{ label: 'Écrire à la mairie', onPress: () => setComposerOpen(true) }}
+            />
+          </View>
+        ) : (
+          <>
+            {messages.map((m) => (
+              <MessageCard
+                key={m.id}
+                message={m}
+                onPress={() => router.push({ pathname: './message-detail', params: { id: m.id } })}
+              />
+            ))}
+            <Text className="text-slate-400 text-xs text-center mt-4">
+              Les messages de la mairie sont diffusés à l'ensemble des représentants élus de votre
+              école.
+            </Text>
+          </>
+        )}
       </ScrollView>
 
       <Modal visible={composerOpen} transparent animationType="slide">

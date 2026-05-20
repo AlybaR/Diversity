@@ -1,11 +1,15 @@
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import { router, type Href } from 'expo-router';
-import { Plus } from 'lucide-react-native';
+import { FolderOpen, Plus } from 'lucide-react-native';
 import { AppHeader } from '../../components/AppHeader';
 import { BottomNav } from '../../components/BottomNav';
 import { DossierCard } from '../../components/DossierCard';
+import { EmptyState } from '../../components/EmptyState';
+import { ErrorBanner } from '../../components/ErrorBanner';
+import { LoadingState } from '../../components/LoadingState';
 import { PrimaryButton } from '../../components/PrimaryButton';
+import { COLORS } from '../../constants/theme';
 import { ECOLES, PERSONNES } from '../../data/mockData';
 import { useDossiers } from '../../hooks';
 
@@ -25,7 +29,12 @@ const ECOLE_DIRECTION = ECOLES.find((e) => e.id === DIRECTION?.ecoleId) ?? ECOLE
 export default function DirectionDossiersScreen() {
   // Filtre strict via la matrice canRoleSeeScope : la direction voit uniquement
   // 'direction_mairie' et 'partage_tripartite', jamais 'parents_mairie' ni 'mairie_interne'.
-  const { data: dossiers = [], isLoading } = useDossiers({
+  const {
+    data: dossiers = [],
+    isLoading,
+    error,
+    refetch,
+  } = useDossiers({
     ecoleId: ECOLE_DIRECTION.id,
     visibleByRole: 'direction',
   });
@@ -79,25 +88,28 @@ export default function DirectionDossiersScreen() {
           })}
         </ScrollView>
 
+        {error && (
+          <ErrorBanner
+            message={`Impossible de charger les sujets (${error.message}).`}
+            onRetry={() => refetch()}
+            className="mb-3"
+          />
+        )}
+
         {isLoading ? (
-          <View className="items-center py-12">
-            <ActivityIndicator color="#4f46e5" />
-            <Text className="text-slate-400 text-xs mt-3">Chargement…</Text>
-          </View>
+          <LoadingState label="Chargement des sujets…" />
         ) : filtered.length === 0 ? (
-          <View className="items-center py-12 bg-white rounded-2xl border border-slate-100">
-            <Text className="text-slate-500 text-sm">Aucun sujet ne correspond au filtre.</Text>
-            <Text className="text-slate-400 text-xs mt-2 px-6 text-center leading-relaxed">
-              Vous ne voyez ici que les sujets transverses (voirie, bâtiment, RDV concertés). Les
-              conversations privées parents ↔ mairie restent confidentielles.
-            </Text>
-            {active !== 'all' && (
-              <Pressable onPress={() => setActive('all')} className="mt-3">
-                <Text className="text-direction-600 text-xs font-semibold">
-                  Voir tous les sujets
-                </Text>
-              </Pressable>
-            )}
+          <View className="bg-white rounded-2xl border border-slate-100">
+            <EmptyState
+              icon={<FolderOpen color={COLORS.slate[400]} size={28} />}
+              title="Aucun sujet"
+              subtitle="Vous ne voyez ici que les sujets transverses (voirie, bâtiment, RDV concertés). Les conversations privées parents ↔ mairie restent confidentielles."
+              cta={
+                active !== 'all'
+                  ? { label: 'Voir tous les sujets', onPress: () => setActive('all') }
+                  : undefined
+              }
+            />
           </View>
         ) : (
           filtered.map((dossier) => (

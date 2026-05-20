@@ -1,17 +1,26 @@
 import { ScrollView, Text, View } from 'react-native';
 import { Alert } from 'react-native';
-import { CalendarPlus } from 'lucide-react-native';
+import { CalendarDays, CalendarPlus } from 'lucide-react-native';
 import { AppHeader } from '../../components/AppHeader';
 import { AppointmentCard } from '../../components/AppointmentCard';
 import { BottomNav } from '../../components/BottomNav';
+import { EmptyState } from '../../components/EmptyState';
+import { ErrorBanner } from '../../components/ErrorBanner';
+import { LoadingState } from '../../components/LoadingState';
 import { PrimaryButton } from '../../components/PrimaryButton';
+import { COLORS } from '../../constants/theme';
 import { PERSONNES } from '../../data/mockData';
 import { useRendezVous } from '../../hooks';
 
 const DIRECTION = PERSONNES.find((p) => p.role === 'direction');
 
 export default function DirectionAppointmentsScreen() {
-  const { data: rdvs = [] } = useRendezVous({ visibleByRole: 'direction' });
+  const {
+    data: rdvs = [],
+    isLoading,
+    error,
+    refetch,
+  } = useRendezVous({ visibleByRole: 'direction' });
   // Direction ne voit que les RDV où elle figure parmi les participants.
   const rdvsDirection = DIRECTION
     ? rdvs.filter((r) =>
@@ -31,32 +40,46 @@ export default function DirectionAppointmentsScreen() {
         subtitle={`${rdvsDirection.length} rendez-vous où je suis attendu(e)`}
       />
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 140 }}>
-        {aVenir.length > 0 && (
-          <>
-            <Text className="text-slate-700 font-bold text-sm mb-3">À venir</Text>
-            {aVenir.map((r) => (
-              <AppointmentCard key={r.id} rdv={r} />
-            ))}
-          </>
+        {error && (
+          <ErrorBanner
+            message={`Impossible de charger les rendez-vous (${error.message}).`}
+            onRetry={() => refetch()}
+            className="mb-3"
+          />
         )}
 
-        {demandes.length > 0 && (
+        {isLoading ? (
+          <LoadingState label="Chargement des rendez-vous…" />
+        ) : (
           <>
-            <Text className="text-slate-700 font-bold text-sm mb-3 mt-2">Demandés</Text>
-            {demandes.map((r) => (
-              <AppointmentCard key={r.id} rdv={r} />
-            ))}
-          </>
-        )}
+            {aVenir.length > 0 && (
+              <>
+                <Text className="text-slate-700 font-bold text-sm mb-3">À venir</Text>
+                {aVenir.map((r) => (
+                  <AppointmentCard key={r.id} rdv={r} />
+                ))}
+              </>
+            )}
 
-        {rdvsDirection.length === 0 && (
-          <View className="items-center py-12 bg-white rounded-2xl border border-slate-100">
-            <Text className="text-slate-500 text-sm">Aucun rendez-vous en cours.</Text>
-            <Text className="text-slate-400 text-xs mt-2 px-6 text-center leading-relaxed">
-              Les rendez-vous concertés impliquant la direction (avec la mairie et les
-              représentants) apparaîtront ici.
-            </Text>
-          </View>
+            {demandes.length > 0 && (
+              <>
+                <Text className="text-slate-700 font-bold text-sm mb-3 mt-2">Demandés</Text>
+                {demandes.map((r) => (
+                  <AppointmentCard key={r.id} rdv={r} />
+                ))}
+              </>
+            )}
+
+            {rdvsDirection.length === 0 && (
+              <View className="bg-white rounded-2xl border border-slate-100">
+                <EmptyState
+                  icon={<CalendarDays color={COLORS.slate[400]} size={28} />}
+                  title="Aucun rendez-vous en cours"
+                  subtitle="Les rendez-vous concertés impliquant la direction (avec la mairie et les représentants) apparaîtront ici."
+                />
+              </View>
+            )}
+          </>
         )}
 
         <View className="mt-5">

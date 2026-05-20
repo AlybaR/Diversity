@@ -18,6 +18,8 @@ import { Bug } from 'lucide-react-native';
 import { AppHeader } from '../../components/AppHeader';
 import { SecondaryButton } from '../../components/SecondaryButton';
 import { supabase } from '../../lib/supabase';
+import { useNetworkStatus } from '../../hooks/useNetworkStatus';
+import { getSentryStatus } from '../../lib/sentry';
 
 interface DiagnosticResult {
   step: string;
@@ -29,6 +31,8 @@ interface DiagnosticResult {
 export default function AuthDebugScreen() {
   const [results, setResults] = useState<DiagnosticResult[]>([]);
   const [loading, setLoading] = useState(true);
+  const network = useNetworkStatus();
+  const sentry = getSentryStatus();
 
   useEffect(() => {
     if (!__DEV__) return;
@@ -104,6 +108,19 @@ export default function AuthDebugScreen() {
     <View className="flex-1 bg-slate-50">
       <AppHeader title="Diagnostic auth" subtitle="__DEV__ uniquement" />
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 80 }}>
+        <View className="bg-white rounded-xl p-3 border border-slate-200 mb-3">
+          <Text className="text-slate-700 text-xs font-bold uppercase tracking-wide mb-2">
+            Environnement
+          </Text>
+          <Text className="text-slate-600 text-xs">
+            Réseau : {network.isOnline ? '✅ en ligne' : '❌ hors-ligne'}
+            {network.isInternetReachable === false ? ' (internet non joignable)' : ''}
+          </Text>
+          <Text className="text-slate-600 text-xs mt-1">
+            Sentry : {sentry.enabled ? '✅ DSN configuré' : '⚪️ DSN non configuré (stub dev only)'}
+          </Text>
+        </View>
+
         <View className="flex-row items-center gap-2 mb-4">
           <Bug color="#dc2626" size={16} />
           <Text className="text-slate-700 text-xs font-bold uppercase tracking-wide">

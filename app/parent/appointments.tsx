@@ -1,19 +1,28 @@
 import { useMemo, useState } from 'react';
 import { Alert, Modal, Pressable, ScrollView, Text, View } from 'react-native';
-import { CalendarPlus, Send, X } from 'lucide-react-native';
+import { CalendarDays, CalendarPlus, Send, X } from 'lucide-react-native';
 import { AppHeader } from '../../components/AppHeader';
 import { BottomNav } from '../../components/BottomNav';
 import { AppointmentCard } from '../../components/AppointmentCard';
+import { EmptyState } from '../../components/EmptyState';
+import { ErrorBanner } from '../../components/ErrorBanner';
+import { LoadingState } from '../../components/LoadingState';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { SecondaryButton } from '../../components/SecondaryButton';
 import { SelectField, type SelectOption } from '../../components/SelectField';
 import { TextInputField } from '../../components/TextInputField';
+import { COLORS } from '../../constants/theme';
 import { useDossiers, useRendezVous } from '../../hooks';
 
 const CRENEAUX = ['Mercredi 27 mai · 17h30', 'Jeudi 28 mai · 18h00', 'Vendredi 29 mai · 08h30'];
 
 export default function AppointmentsScreen() {
-  const { data: rdvs = [] } = useRendezVous({ visibleByRole: 'parent_admin' });
+  const {
+    data: rdvs = [],
+    isLoading,
+    error,
+    refetch,
+  } = useRendezVous({ visibleByRole: 'parent_admin' });
   const { data: dossiers = [] } = useDossiers({ visibleByRole: 'parent_admin' });
   const [modalOpen, setModalOpen] = useState(false);
   const [titre, setTitre] = useState('');
@@ -52,28 +61,54 @@ export default function AppointmentsScreen() {
     <View className="flex-1 bg-slate-50">
       <AppHeader title="Rendez-vous" subtitle={`${rdvs.length} rendez-vous`} />
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 140 }}>
-        {aVenir.length > 0 && (
-          <>
-            <Text className="text-slate-700 font-bold text-sm mb-3">À venir</Text>
-            {aVenir.map((r) => (
-              <AppointmentCard key={r.id} rdv={r} />
-            ))}
-          </>
+        {error && (
+          <ErrorBanner
+            message={`Impossible de charger les rendez-vous (${error.message}).`}
+            onRetry={() => refetch()}
+            className="mb-3"
+          />
         )}
 
-        {demandes.length > 0 && (
+        {isLoading ? (
+          <LoadingState label="Chargement des rendez-vous…" />
+        ) : rdvs.length === 0 ? (
+          <View className="bg-white rounded-2xl border border-slate-100">
+            <EmptyState
+              icon={<CalendarDays color={COLORS.slate[400]} size={28} />}
+              title="Aucun rendez-vous"
+              subtitle="Proposez un créneau à la mairie pour échanger sur un sujet précis."
+              cta={{
+                label: 'Demander un rendez-vous',
+                onPress: () => setModalOpen(true),
+              }}
+            />
+          </View>
+        ) : (
           <>
-            <Text className="text-slate-700 font-bold text-sm mb-3 mt-2">Demandés</Text>
-            {demandes.map((r) => (
-              <AppointmentCard key={r.id} rdv={r} />
-            ))}
+            {aVenir.length > 0 && (
+              <>
+                <Text className="text-slate-700 font-bold text-sm mb-3">À venir</Text>
+                {aVenir.map((r) => (
+                  <AppointmentCard key={r.id} rdv={r} />
+                ))}
+              </>
+            )}
+
+            {demandes.length > 0 && (
+              <>
+                <Text className="text-slate-700 font-bold text-sm mb-3 mt-2">Demandés</Text>
+                {demandes.map((r) => (
+                  <AppointmentCard key={r.id} rdv={r} />
+                ))}
+              </>
+            )}
+
+            <Text className="text-slate-700 font-bold text-sm mb-3 mt-2">Passés</Text>
+            <View className="bg-white rounded-2xl p-4 border border-slate-100 items-center">
+              <Text className="text-slate-400 text-xs">Aucun rendez-vous passé dans la démo.</Text>
+            </View>
           </>
         )}
-
-        <Text className="text-slate-700 font-bold text-sm mb-3 mt-2">Passés</Text>
-        <View className="bg-white rounded-2xl p-4 border border-slate-100 items-center">
-          <Text className="text-slate-400 text-xs">Aucun rendez-vous passé dans la démo.</Text>
-        </View>
 
         <View className="mt-5">
           <PrimaryButton

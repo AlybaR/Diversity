@@ -1,11 +1,15 @@
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import { router } from 'expo-router';
-import { Plus } from 'lucide-react-native';
+import { FolderOpen, Plus } from 'lucide-react-native';
 import { AppHeader } from '../../components/AppHeader';
 import { BottomNav } from '../../components/BottomNav';
 import { DossierCard } from '../../components/DossierCard';
+import { EmptyState } from '../../components/EmptyState';
+import { ErrorBanner } from '../../components/ErrorBanner';
+import { LoadingState } from '../../components/LoadingState';
 import { PrimaryButton } from '../../components/PrimaryButton';
+import { COLORS } from '../../constants/theme';
 import { useDossiers } from '../../hooks';
 
 type FilterId = 'all' | 'open' | 'urgent' | 'waiting' | 'resolved';
@@ -20,7 +24,12 @@ const FILTERS: { id: FilterId; label: string }[] = [
 
 export default function DossiersScreen() {
   // Côté parent : filtre par rôle → invisibles 'direction_mairie' et 'mairie_interne'.
-  const { data: dossiers = [], isLoading } = useDossiers({ visibleByRole: 'parent_admin' });
+  const {
+    data: dossiers = [],
+    isLoading,
+    error,
+    refetch,
+  } = useDossiers({ visibleByRole: 'parent_admin' });
   const [active, setActive] = useState<FilterId>('all');
 
   const filtered = useMemo(() => {
@@ -71,21 +80,32 @@ export default function DossiersScreen() {
           })}
         </ScrollView>
 
+        {error && (
+          <ErrorBanner
+            message={`Impossible de charger les dossiers (${error.message}).`}
+            onRetry={() => refetch()}
+            className="mb-3"
+          />
+        )}
+
         {isLoading ? (
-          <View className="items-center py-12">
-            <ActivityIndicator color="#2563eb" />
-            <Text className="text-slate-400 text-xs mt-3">Chargement des dossiers…</Text>
-          </View>
+          <LoadingState label="Chargement des dossiers…" />
         ) : filtered.length === 0 ? (
-          <View className="items-center py-12 bg-white rounded-2xl border border-slate-100">
-            <Text className="text-slate-500 text-sm">Aucun dossier ne correspond au filtre.</Text>
-            {active !== 'all' && (
-              <Pressable onPress={() => setActive('all')} className="mt-3">
-                <Text className="text-primary-500 text-xs font-semibold">
-                  Voir tous les dossiers
-                </Text>
-              </Pressable>
-            )}
+          <View className="bg-white rounded-2xl border border-slate-100">
+            <EmptyState
+              icon={<FolderOpen color={COLORS.slate[400]} size={28} />}
+              title={active === 'all' ? 'Aucun dossier' : 'Aucun dossier ne correspond au filtre'}
+              subtitle={
+                active === 'all'
+                  ? 'Tu n’as pas encore ouvert de dossier. Crée ta première demande pour commencer.'
+                  : undefined
+              }
+              cta={
+                active !== 'all'
+                  ? { label: 'Voir tous les dossiers', onPress: () => setActive('all') }
+                  : undefined
+              }
+            />
           </View>
         ) : (
           filtered.map((dossier) => (

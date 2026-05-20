@@ -40,12 +40,14 @@ function homeForRole(role: Role): Href {
 }
 
 export function AuthGuard({ allowedRoles, fallbackHref, children }: AuthGuardProps) {
+  // ⚠️ useSession DOIT être appelé en tête, sans condition, sinon "Hook called
+  // conditionally" en mode dev. On bypass APRÈS récupération du résultat.
+  const { loading, isAuthorized, role } = useSession();
+
   // Bypass total en mode mock : l'app continue de fonctionner comme avant
   if (!USE_SUPABASE) {
     return <>{children}</>;
   }
-
-  const { loading, isAuthorized, role } = useSession();
 
   if (loading) {
     return (

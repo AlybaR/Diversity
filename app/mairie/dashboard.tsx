@@ -17,20 +17,36 @@ import { BottomNav } from '../../components/BottomNav';
 import { Card } from '../../components/Card';
 import { DossierCard } from '../../components/DossierCard';
 import { AppointmentCard } from '../../components/AppointmentCard';
+import { ErrorBanner } from '../../components/ErrorBanner';
+import { LoadingState } from '../../components/LoadingState';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { MAIRIE } from '../../data/mockData';
 import { useDossiers, useRendezVous, useStatsMairie } from '../../hooks';
 
 export default function MairieDashboardScreen() {
   const insets = useSafeAreaInsets();
-  const { data: stats } = useStatsMairie(MAIRIE.id);
-  const { data: dossiers = [] } = useDossiers();
-  const { data: rdvs = [] } = useRendezVous();
+  const { data: stats, isLoading: statsLoading, error: statsError } = useStatsMairie(MAIRIE.id);
+  const { data: dossiers = [], error: dossiersError } = useDossiers();
+  const { data: rdvs = [], error: rdvsError } = useRendezVous();
+  const aggregateError = statsError || dossiersError || rdvsError;
+
+  if (statsLoading && !stats) {
+    return (
+      <View className="flex-1 bg-slate-50">
+        <LoadingState label="Chargement du tableau de bord…" />
+      </View>
+    );
+  }
 
   if (!stats) {
     return (
-      <View className="flex-1 bg-slate-50 items-center justify-center">
-        <Text className="text-slate-400 text-sm">Chargement...</Text>
+      <View className="flex-1 bg-slate-50 p-4 justify-center">
+        <ErrorBanner
+          title="Tableau de bord indisponible"
+          message={
+            aggregateError?.message ?? 'Les statistiques de la mairie ne peuvent pas être chargées.'
+          }
+        />
       </View>
     );
   }
@@ -84,6 +100,13 @@ export default function MairieDashboardScreen() {
         contentContainerStyle={{ padding: 16, paddingBottom: 140 }}
         showsVerticalScrollIndicator={false}
       >
+        {aggregateError && (
+          <ErrorBanner
+            message={`Certaines données n’ont pas pu être chargées (${aggregateError.message}).`}
+            className="mb-3"
+          />
+        )}
+
         {/* Section Activité — état du parc (compteurs d'instances) */}
         <View>
           <View className="flex-row items-center gap-2 mb-2">

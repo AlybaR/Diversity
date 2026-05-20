@@ -5,6 +5,129 @@ Le projet web `mockups-app/` n'est jamais modifié.
 
 ---
 
+## 2026-05-20 — Étape 19 : Phase 3 — Robustesse production (UX d'état + Sentry + offline + push)
+
+### Contexte
+
+Phase 2 (auth magic link) en attente du retest end-to-end (rate limit Supabase). On profite du blocage pour démarrer Phase 3 : rendre l'app utilisable même quand le réseau flanche, et instrumenter le code pour qu'on sache quand quelque chose plante avant que l'utilisateur s'en rende compte.
+
+But : passer d'un démo qui « marche en happy path » à une app robuste où chaque écran sait :
+- Qu'il est en train de charger (`<LoadingState />`)
+- Qu'il a échoué à charger (`<ErrorBanner />` avec bouton Réessayer)
+- Qu'il a rien à afficher (`<EmptyState />` avec CTA)
+- Que le device est hors-ligne (`<OfflineBanner />` global)
+
+Plus : capture les erreurs runtime non-handlées (ErrorBoundary), prépare la collecte des tokens push (Phase 5 enverra), et pose un stub Sentry qu'on activera quand le DSN sera créé.
+
+### Composants UX d'état (livraison atomique)
+
+**4 nouveaux composants dans `components/`** :
+
+- **`<ErrorBanner />`** — bandeau rouge inline avec icône, message, bouton « Réessayer » optionnel. Variantes `default` (pleine largeur) et `compact` (sidebar).
+- **`<EmptyState />`** — placeholder centré avec icône lucide, titre, sous-titre, CTA optionnel. Pour les listes vides (« Aucun dossier », « Pas de message »).
+- **`<LoadingState />`** — ActivityIndicator + label contextuel. Variantes `centered` (pleine zone) et `inline` (3-line).
+- **`<OfflineBanner />`** — bandeau orange global, monté dans `app/_layout.tsx`. S'affiche quand `useNetworkStatus()` détecte que le device est hors-ligne. React Query continue de servir le cache.
+
+**Pourquoi des composants dédiés** : avant Phase 3, chaque écran affichait son propre `<Text>Chargement…</Text>` ad hoc. C'était inconsistant, invisible aux QA, et chaque copie de la formulation pouvait dériver. Le composant centralise visuel + wording.
+
+### Détection réseau
+
+- **`@react-native-community/netinfo`** installé.
+- **`hooks/useNetworkStatus.ts`** : expose `{ isOnline, isInternetReachable }`. Sur web, écoute `online`/`offline` events. Sur natif, abonne à NetInfo. Import dynamique de NetInfo pour ne pas alourdir le bundle web.
+- **`<OfflineBanner />`** monté dans `_layout.tsx` juste sous le PhoneFrame, au-dessus du Stack. Reste sticky en haut quel que soit la route.
+
+### ErrorBoundary global
+
+- **`components/ErrorBoundary.tsx`** — capture les erreurs React non-handlées qui causeraient un écran blanc. Affiche une UI fallback avec stack trace en `__DEV__` + bouton « Recharger ». Utilise `componentDidCatch` pour signaler à Sentry.
+- Monté **au-dessus de tout** dans `_layout.tsx` (avant `QueryClientProvider`). Une seule instance couvre toutes les routes.
+
+### Stub Sentry (avant activation réelle)
+
+- **`lib/sentry.ts`** — couche d'abstraction qui expose `captureException`, `captureMessage`, `setUser`, `clearUser`, `addBreadcrumb`. En `__DEV__` : log `console.log` structuré tagué `[sentry]`. En prod sans DSN : no-op silencieux. Quand le DSN sera configuré (`EXPO_PUBLIC_SENTRY_DSN`), il suffira de remplacer les corps de fonctions par les appels `@sentry/react-native` sans toucher aux 10+ sites d'appel.
+- **`hooks/useSession.ts`** appelle `setUser({ id, email, role })` quand la personne est chargée + `clearUser()` au signOut.
+- **`app/auth/callback.tsx`** : `addBreadcrumb` à chaque étape (session fetched, linked), `captureException` sur erreur RPC, `captureMessage` sur `no-session` ou `email-not-found`.
+- **`/auth/debug`** affiche maintenant l'état Sentry (`enabled` + `dsnConfigured`) en plus du diagnostic auth.
+
+### Push notifications (collecte uniquement)
+
+- **`expo-notifications`** installé.
+- **`lib/notifications.ts`** : `registerForPushNotifications(personneId)` demande la permission OS, récupère le token Expo Push (via `Constants.expoConfig.extra.eas.projectId`), et le persiste dans `personnes.push_token`. + `configureNotificationHandler()` pour que les notifs s'affichent en foreground.
+- **`hooks/usePushRegistration.ts`** : déclenche l'enregistrement quand `isAuthorized` passe à `true`. Idempotent.
+- **`<SessionEffects />`** invisible monté dans `_layout.tsx` (sous `QueryClientProvider`) — appelle le hook globalement, no-op tant que pas de session.
+- **`supabase/migrations/0004_personnes_push_token.sql`** : ajoute la colonne `push_token` à `personnes` + policy `personnes_update_self` qui autorise un user à patcher sa propre ligne. Index partiel sur `push_token IS NOT NULL` pour le futur job d'envoi.
+
+**Côté serveur** : l'envoi effectif sera branché en Phase 5 (Edge Function Supabase + Expo Push API). Pour le MVP, on collecte les tokens sans pousser.
+
+### Écrans modifiés (intégration des nouveaux composants)
+
+8 écrans clés refactorés pour utiliser `<LoadingState />`, `<ErrorBanner />`, `<EmptyState />` à la place des states ad hoc :
+
+| Écran | Avant | Après |
+| --- | --- | --- |
+| `parent/dossiers.tsx` | ActivityIndicator + Text inline + View bricolée | `<LoadingState />` / `<ErrorBanner onRetry />` / `<EmptyState icon=FolderOpen cta="Voir tous" />` |
+| `parent/messages.tsx` | Liste seule, pas d'état vide | `<LoadingState />` / `<ErrorBanner />` / `<EmptyState icon=MessageSquare cta="Écrire à la mairie" />` |
+| `parent/appointments.tsx` | Sections vides invisibles | `<LoadingState />` / `<ErrorBanner />` / `<EmptyState icon=CalendarDays cta="Demander un RDV" />` |
+| `parent/home.tsx` | Bloquait si stats OU dernierMessage OU prochainRdv manquant | Spinner uniquement sur premier load ; sinon EmptyState par section. ErrorBanner agrégé en haut. |
+| `direction/dossiers.tsx` | Idem ad hoc | LoadingState + ErrorBanner + EmptyState |
+| `direction/messages.tsx` | Idem | Idem |
+| `direction/appointments.tsx` | Idem | Idem |
+| `direction/home.tsx` | Pas d'état d'erreur | ErrorBanner agrégé (dossiers + messages + rdvs) |
+| `mairie/dashboard.tsx` | "Chargement..." Text simple | LoadingState dédié + ErrorBanner si stats KO + ErrorBanner agrégé scrollable |
+| `mairie/schools.tsx` | Liste seule | LoadingState + ErrorBanner + EmptyState |
+
+Bug bonus fixé : **`AuthGuard.tsx`** — `useSession` était appelé conditionnellement après un early `return` (mode mock), violation Rules of Hooks. Corrigé en appelant le hook en tête, puis le check `USE_SUPABASE` après.
+
+### Configuration
+
+- **`.env.example`** : ajout de `EXPO_PUBLIC_SENTRY_DSN=` (vide par défaut, à remplir quand le compte Sentry sera créé).
+
+### Fichiers créés
+
+| Fichier | Rôle |
+| --- | --- |
+| `components/ErrorBanner.tsx` | Bandeau erreur inline |
+| `components/EmptyState.tsx` | Placeholder liste vide |
+| `components/LoadingState.tsx` | Indicateur de chargement |
+| `components/OfflineBanner.tsx` | Bandeau global hors-ligne |
+| `components/ErrorBoundary.tsx` | Capture des erreurs React non-handlées |
+| `hooks/useNetworkStatus.ts` | Hook NetInfo (cross-platform web + natif) |
+| `hooks/usePushRegistration.ts` | Hook gate sur session pour push registration |
+| `lib/sentry.ts` | Stub Sentry — captureException / setUser / breadcrumb |
+| `lib/notifications.ts` | Push registration + config handler |
+| `supabase/migrations/0004_personnes_push_token.sql` | Colonne push_token + policy update self |
+
+### Fichiers modifiés
+
+- `app/_layout.tsx` : ErrorBoundary global + OfflineBanner + SessionEffects + configureNotificationHandler
+- `components/AuthGuard.tsx` : fix Rules of Hooks (useSession en tête)
+- `hooks/useSession.ts` : Sentry setUser/clearUser sur changement de session
+- `app/auth/callback.tsx` : breadcrumbs + captureException + captureMessage aux points sensibles
+- `app/auth/debug.tsx` : afficher état réseau + Sentry
+- `.env.example` : doc `EXPO_PUBLIC_SENTRY_DSN`
+- 9 écrans intégration ErrorBanner/EmptyState/LoadingState (cf. tableau)
+
+### Vérifications
+
+- ✅ `npm run typecheck` (tsc --noEmit) exit 0
+- ✅ `npm run lint` exit 0 (0 erreur, 0 warning après lint:fix)
+- ✅ `npm run bundle:check` exit 0 (bundle web 4.25 MB)
+- ⏳ E2E Playwright à relancer côté CI une fois pushé (devraient passer en mock mode, USE_SUPABASE=false)
+- ⏳ Test manuel offline mode + push à faire quand on retournera sur device
+
+### Décisions de design
+
+- **Stub Sentry plutôt qu'install direct** : éviter la config plugin EAS + DSN avant qu'on ait un compte Sentry réel. Migration future = remplacer les corps de fonctions dans `lib/sentry.ts`. Zéro changement aux 10+ sites d'appel.
+- **Push : collecte ≠ envoi** : on stocke le token mais on n'envoie rien tant que Phase 5 n'a pas branché l'Edge Function + Expo Push API. La permission OS est demandée à chaque login (idempotent).
+- **OfflineBanner non-cliquable** : la connexion revient automatiquement, React Query refetch tout seul via onlineManager. Ajouter un bouton « Réessayer » créerait une fausse promesse.
+- **ErrorBoundary fallback minimaliste** : on évite de faire un "vraiment beau" écran d'erreur. L'objectif est de ne pas planter, pas de proposer une expérience d'erreur.
+
+### Suite immédiate
+
+- Phase 3 partie 2 (à venir) : Sentry plugin EAS + DSN réel + envoi serveur des notifications (Edge Function + Expo Push)
+- Avant Phase 4 : retester le magic link end-to-end (Phase 2) quand le rate limit Supabase retombe (2 OTP/h/email)
+
+---
+
 ## 2026-05-20 — Étape 18b : Fix bugs auth (RPC ambiguous + RLS récursive) + instrumentation permanente
 
 ### Contexte
