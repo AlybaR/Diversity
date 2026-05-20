@@ -17,6 +17,7 @@ import { TextInputField } from '../components/TextInputField';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { SecondaryButton } from '../components/SecondaryButton';
 import { ECOLES, MAIRIE } from '../data/mockData';
+import { USE_SUPABASE } from '../services/_config';
 
 type KeyState = 'input' | 'valid' | 'invalid' | 'expired';
 
@@ -162,7 +163,18 @@ export default function JoinSchoolScreen() {
 
             <PrimaryButton
               label="Confirmer et créer mon compte"
-              onPress={() => router.push('/create-account')}
+              onPress={() => {
+                // Mode Supabase : on passe par le magic link (la clé sert juste à pré-router).
+                // Mode mock : ancien flow create-account (formulaire local sans persistance).
+                if (USE_SUPABASE) {
+                  router.push({
+                    pathname: '/sign-in',
+                    params: { role: 'parent', ecole: ECOLES[0].id },
+                  });
+                } else {
+                  router.push('/create-account');
+                }
+              }}
             />
           </View>
         )}

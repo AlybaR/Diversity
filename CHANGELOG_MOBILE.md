@@ -5,6 +5,68 @@ Le projet web `mockups-app/` n'est jamais modifié.
 
 ---
 
+## 2026-05-20 — Étape 18 : Phase 2 — Auth magic link + guards de route
+
+### Contexte
+
+Suite des étapes 16-17 (Supabase fondations + services derrière flag `USE_SUPABASE`). Pour que les requêtes RLS retournent autre chose que 0 ligne, il faut maintenant que l'utilisateur soit authentifié via Supabase Auth. La Phase 2 branche tout ce qu'il faut pour que l'utilisateur tape son email → reçoive un magic link → atterrisse dans la bonne zone selon son rôle, sans qu'on ait à changer les services ni les écrans existants.
+
+Branche : `feat/phase2-auth-magic-link` (à partir de l'état post-Phase 1, sera rebasée sur main après merge de la PR Phase 1).
+
+### Décisions
+
+- **Magic link uniquement** (pas de mot de passe). Email envoyé → clic → JWT en session.
+- **Email inconnu = refus catégorique** (`/auth/no-access`). Pas d'auto-création. Les invitations passent par la mairie en amont (workflow MVP : ajout manuel via SQL Editor).
+- **Liaison `auth.users` ↔ `personnes`** côté applicatif dans `/auth/callback` : à la première connexion, on cherche la personne par email et on update `auth_user_id`. Les connexions suivantes utilisent ce lien.
+- **Guards conditionnels au flag** : `AuthGuard` bypass complètement quand `USE_SUPABASE=false`. L'app continue à marcher en mode mock pour les tests E2E et le dev local.
+- **Welcome / join-school adaptés au flag** : en mode Supabase, les boutons "Je suis X" pointent vers `/sign-in?role=X`. En mode mock, comportement actuel inchangé.
+
+### Fichiers créés
+
+- `lib/supabase.ts` mis à jour : `persistSession: true`, `autoRefreshToken: true`, `detectSessionInUrl: true` (web), `storage: AsyncStorage` (RN). Désormais Supabase Auth peut conserver la session entre rechargements.
+- `hooks/useSession.ts` : hook central qui combine session Supabase + ligne `personnes`. Expose `{ session, user, personne, role, loading, isAuthorized, signOut }`. Réagit à `onAuthStateChange`.
+- `services/supabase/authLink.ts` : `findPersonneByEmail`, `findPersonneByAuthUserId`, `linkAuthToPersonne` (idempotent).
+- `components/AuthGuard.tsx` : wrap les layouts protégés. Bypass total si `USE_SUPABASE=false`. Loading / redirect sign-in / redirect zone correcte sinon.
+- `app/sign-in/index.tsx` : saisie email + `signInWithOtp`.
+- `app/sign-in/sent.tsx` : confirmation envoi + renvoi.
+- `app/auth/callback.tsx` : récupère session, lie personne, redirige selon le rôle.
+- `app/auth/no-access.tsx` : email inconnu / accès refusé.
+- `supabase/seed-test-user.sql` : ajoute l'email Kouceila comme `mairie_admin`.
+- `supabase/tests/rls-checks.sql` : 6 tests SQL à lancer manuellement dans le SQL Editor pour valider l'isolation par scope.
+
+### Fichiers modifiés
+
+- `app/_layout.tsx` : nouveaux Stack.Screen `sign-in`, `auth`, `direction`.
+- `app/parent/_layout.tsx`, `app/direction/_layout.tsx`, `app/mairie/_layout.tsx` : wrap dans `<AuthGuard allowedRoles={…}>`.
+- `app/index.tsx` (Welcome) : routes des boutons conditionnelles `USE_SUPABASE`.
+- `app/join-school.tsx` : bouton "Confirmer" → `/sign-in?role=parent&ecole=...` si Supabase, sinon ancien flow.
+- `hooks/index.ts` : export `useSession`.
+- `.env.example` : ajout de `EXPO_PUBLIC_USE_SUPABASE=false` documenté.
+- `supabase/README.md` : section "Activer Supabase Auth" complète (config dashboard, seed test user, activation flag, dépannage).
+
+### Limites assumées
+
+- **Tests E2E magic link non écrits** : intercepter un email de magic link en Playwright nécessite un mailcatcher (Mailpit/Mailhog) et du tooling Supabase. Hors scope MVP. Tests E2E existants continuent en mode mock.
+- **Workflow d'invitation depuis l'app** non encore implémenté. Pour le MVP, la mairie ajoute les personnes via SQL Editor.
+- **Liaison auth_user_id idempotente mais non sécurisée** : si une `personne.auth_user_id` est déjà rempli et qu'un autre user signe avec le même email, l'update fait `IS NULL` donc ne fait rien (la personne reste liée au premier auth user). Acceptable MVP, à durcir avant prod publique.
+
+### Comment activer (côté utilisateur)
+
+1. Côté dashboard Supabase : configurer **Site URL** (`http://localhost:8081`) + **Redirect URLs** (`http://localhost:8081/**`)
+2. Côté SQL Editor : exécuter `supabase/seed-test-user.sql`
+3. Côté `.env.local` : ajouter `EXPO_PUBLIC_USE_SUPABASE=true`
+4. Redémarrer Metro
+5. `http://localhost:8081` → bouton mairie → email Kouceila → clic lien → atterrit sur `/mairie/dashboard` avec vraies données Supabase
+
+### Vérifications
+
+- ✅ TypeScript compile (en attente du résultat final)
+- ✅ Lint passe (en attente)
+- ⏳ Bundle web — à valider
+- ✅ Tests E2E existants en mode mock — inchangés, restent verts
+
+---
+
 ## 2026-05-19 — Étape 17 : Phase 1.2 — services Supabase prêts à activer
 
 ### Contexte

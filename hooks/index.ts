@@ -16,3 +16,4 @@ export * from './useMessages';
 export * from './useRendezVous';
 export * from './usePersonnes';
 export * from './useStats';
+export * from './useSession';

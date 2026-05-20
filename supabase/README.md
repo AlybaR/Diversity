@@ -122,6 +122,71 @@ Workflow d'invitation (Phase 2, à venir) :
 - **Migrations** : numérote-les séquentiellement (`0003_...`, `0004_...`), jamais modifier une migration déjà appliquée — créer une nouvelle migration de modification.
 - **Tester les policies** : avant chaque release, vérifier qu'un utilisateur d'un rôle ne peut PAS lire ce qui appartient à un autre canal. À automatiser avec des tests `pgTAP` (Phase 1 à étendre).
 
+## Activer Supabase Auth (Phase 2)
+
+Une fois les migrations + seed exécutés, tu peux passer l'app du mode mock au mode Supabase réel.
+
+### 1. Configurer Auth dans le dashboard
+
+**Authentication → URL Configuration** :
+- **Site URL** : `http://localhost:8081`
+- **Redirect URLs** (whitelist) : ajouter `http://localhost:8081/**`
+- Plus tard pour la prod : ajouter aussi `https://passerelle.fr/**`
+
+**Authentication → Email Templates → Magic Link** (optionnel) :
+- Personnaliser le sujet et le corps en français
+- Garder la variable `{{ .ConfirmationURL }}` pour le lien
+
+### 2. Ajouter ton compte de test
+
+Dans le SQL Editor, exécute `seed-test-user.sql` (ajusté avec ton email réel) :
+
+```sql
+-- adapte la valeur de email/role à ton besoin
+INSERT INTO personnes (id, prenom, nom, email, role, service, fonction, actif)
+VALUES (
+  'personne-toi', 'Ton', 'Nom',
+  'ton.email@exemple.fr',
+  'mairie_admin',  -- voit tous les scopes (ou 'parent_admin', 'direction', etc.)
+  'Éducation', 'Administrateur',
+  TRUE
+)
+ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email;
+```
+
+### 3. Activer le flag dans l'app
+
+Dans `mobile-app/.env.local` :
+
+```bash
+EXPO_PUBLIC_USE_SUPABASE=true
+```
+
+Puis redémarre Metro (`Ctrl+C` puis `npx expo start --web --port 8081`).
+
+### 4. Tester le parcours
+
+1. Ouvre `http://localhost:8081`
+2. Clique sur le bouton correspondant à ton rôle (parent / mairie / direction)
+3. Saisis ton email → "Recevoir le lien"
+4. Vérifie ta boîte mail → clique sur le magic link
+5. Tu atterris dans la zone de ton rôle avec les vraies données Supabase
+
+À la première connexion, l'app lie automatiquement `auth_user_id` à ta ligne `personnes` (matché par email). Les connexions suivantes utilisent ce lien.
+
+### 5. Cas d'erreur
+
+| Symptôme | Cause probable |
+| --- | --- |
+| Email envoyé mais clic = "Accès non autorisé" | Pas de ligne `personnes` avec ton email. Lance le seed test user. |
+| Email non reçu | Vérifie les spams. Vérifie aussi que le template Auth est activé dans le dashboard. |
+| Clic sur magic link = page blanche | `Redirect URLs` mal configurées. Vérifie la whitelist Authentication. |
+| Tu vois "Accès refusé" sur toutes les zones | Ta personne a un rôle qui ne matche aucune zone. Vérifie `SELECT role FROM personnes WHERE email = …`. |
+
+## Tester les politiques RLS
+
+`tests/rls-checks.sql` (à venir) contient des assertions pour valider que les policies bloquent correctement chaque scope par rôle. À lancer après chaque modif de RLS.
+
 ## Ressources
 
 - [Documentation Supabase](https://supabase.com/docs)

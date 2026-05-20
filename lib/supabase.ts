@@ -14,9 +14,18 @@
  * La clé `anon` est volontairement publique : la sécurité repose sur les politiques RLS
  * côté PostgreSQL (cf. supabase/migrations/0002_rls_policies.sql). Aucune donnée sensible
  * n'est exposée tant que les policies sont bien configurées.
+ *
+ * Configuration auth (Phase 2) :
+ *   - Web : utilise `localStorage` natif (storage undefined). `detectSessionInUrl: true`
+ *     pour parser le `#access_token=` reçu après clic sur magic link.
+ *   - iOS/Android : utilise `@react-native-async-storage/async-storage`.
+ *   - `persistSession: true` : la session survit aux rechargements
+ *   - `autoRefreshToken: true` : le JWT se renouvelle automatiquement avant expiration
  */
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
+import { Platform } from 'react-native';
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
@@ -32,16 +41,21 @@ if (!supabaseUrl || !supabaseAnonKey) {
   }
 }
 
+const isWeb = Platform.OS === 'web';
+
 export const supabase = createClient(
   supabaseUrl ?? 'https://placeholder.supabase.co',
   supabaseAnonKey ?? 'placeholder-anon-key',
   {
     auth: {
-      // Persistance de session : à brancher avec @react-native-async-storage/async-storage
-      // en Phase 2 (auth magic link). Pour l'instant, en Phase 1, on ne fait que de la lecture.
-      persistSession: false,
-      autoRefreshToken: false,
-      detectSessionInUrl: false,
+      // Web : localStorage natif (storage undefined laisse Supabase choisir).
+      // Natif : AsyncStorage requis pour persister la session entre sessions.
+      storage: isWeb ? undefined : AsyncStorage,
+      persistSession: true,
+      autoRefreshToken: true,
+      // detectSessionInUrl : seulement utile côté web pour parser le #access_token
+      // après clic sur le magic link.
+      detectSessionInUrl: isWeb,
     },
   },
 );
