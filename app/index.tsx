@@ -5,6 +5,17 @@ import { router, type Href } from 'expo-router';
 import { ChevronRight, HelpCircle, Shield, Sparkles } from 'lucide-react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { GRADIENTS } from '../constants/theme';
+import { USE_SUPABASE } from '../services/_config';
+
+// Routes des boutons "Je suis X" selon le mode (mock vs Supabase Auth).
+// En mode mock : accès direct à la zone, pour que les tests E2E et le dev local
+// continuent sans avoir besoin d'auth. En mode Supabase : passe par /sign-in.
+const mairieRoute: Href = USE_SUPABASE
+  ? ('/sign-in?role=mairie' as Href)
+  : ('/mairie/dashboard' as Href);
+const directionRoute: Href = USE_SUPABASE
+  ? ('/sign-in?role=direction' as Href)
+  : ('/direction/home' as Href);
 
 // SVG inline pour matcher les icônes du web mockup (cohérence visuelle stricte)
 function SchoolIcon({ size = 40, color = '#ffffff' }: { size?: number; color?: string }) {
@@ -184,7 +195,7 @@ export default function WelcomeScreen() {
           </Pressable>
 
           <Pressable
-            onPress={() => router.push('/mairie/dashboard')}
+            onPress={() => router.push(mairieRoute)}
             style={({ pressed }) => ({
               opacity: pressed ? 0.85 : 1,
               transform: [{ scale: pressed ? 0.98 : 1 }],
@@ -208,7 +219,7 @@ export default function WelcomeScreen() {
           </Pressable>
 
           <Pressable
-            onPress={() => router.push('/direction/home' as Href)}
+            onPress={() => router.push(directionRoute)}
             style={({ pressed }) => ({
               opacity: pressed ? 0.85 : 1,
               transform: [{ scale: pressed ? 0.98 : 1 }],

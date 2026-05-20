@@ -37,8 +37,11 @@ export default function RootLayout() {
             <Stack.Screen name="index" />
             <Stack.Screen name="join-school" />
             <Stack.Screen name="create-account" />
+            <Stack.Screen name="sign-in" />
+            <Stack.Screen name="auth" />
             <Stack.Screen name="parent" />
             <Stack.Screen name="mairie" />
+            <Stack.Screen name="direction" />
           </Stack>
         </PhoneFrame>
       </SafeAreaProvider>

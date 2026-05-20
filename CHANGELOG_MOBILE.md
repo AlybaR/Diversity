@@ -5,6 +5,180 @@ Le projet web `mockups-app/` n'est jamais modifié.
 
 ---
 
+## 2026-05-20 — Étape 18 : Phase 2 — Auth magic link + guards de route
+
+### Contexte
+
+Suite des étapes 16-17 (Supabase fondations + services derrière flag `USE_SUPABASE`). Pour que les requêtes RLS retournent autre chose que 0 ligne, il faut maintenant que l'utilisateur soit authentifié via Supabase Auth. La Phase 2 branche tout ce qu'il faut pour que l'utilisateur tape son email → reçoive un magic link → atterrisse dans la bonne zone selon son rôle, sans qu'on ait à changer les services ni les écrans existants.
+
+Branche : `feat/phase2-auth-magic-link` (à partir de l'état post-Phase 1, sera rebasée sur main après merge de la PR Phase 1).
+
+### Décisions
+
+- **Magic link uniquement** (pas de mot de passe). Email envoyé → clic → JWT en session.
+- **Email inconnu = refus catégorique** (`/auth/no-access`). Pas d'auto-création. Les invitations passent par la mairie en amont (workflow MVP : ajout manuel via SQL Editor).
+- **Liaison `auth.users` ↔ `personnes`** côté applicatif dans `/auth/callback` : à la première connexion, on cherche la personne par email et on update `auth_user_id`. Les connexions suivantes utilisent ce lien.
+- **Guards conditionnels au flag** : `AuthGuard` bypass complètement quand `USE_SUPABASE=false`. L'app continue à marcher en mode mock pour les tests E2E et le dev local.
+- **Welcome / join-school adaptés au flag** : en mode Supabase, les boutons "Je suis X" pointent vers `/sign-in?role=X`. En mode mock, comportement actuel inchangé.
+
+### Fichiers créés
+
+- `lib/supabase.ts` mis à jour : `persistSession: true`, `autoRefreshToken: true`, `detectSessionInUrl: true` (web), `storage: AsyncStorage` (RN). Désormais Supabase Auth peut conserver la session entre rechargements.
+- `hooks/useSession.ts` : hook central qui combine session Supabase + ligne `personnes`. Expose `{ session, user, personne, role, loading, isAuthorized, signOut }`. Réagit à `onAuthStateChange`.
+- `services/supabase/authLink.ts` : `findPersonneByEmail`, `findPersonneByAuthUserId`, `linkAuthToPersonne` (idempotent).
+- `components/AuthGuard.tsx` : wrap les layouts protégés. Bypass total si `USE_SUPABASE=false`. Loading / redirect sign-in / redirect zone correcte sinon.
+- `app/sign-in/index.tsx` : saisie email + `signInWithOtp`.
+- `app/sign-in/sent.tsx` : confirmation envoi + renvoi.
+- `app/auth/callback.tsx` : récupère session, lie personne, redirige selon le rôle.
+- `app/auth/no-access.tsx` : email inconnu / accès refusé.
+- `supabase/seed-test-user.sql` : ajoute l'email Kouceila comme `mairie_admin`.
+- `supabase/tests/rls-checks.sql` : 6 tests SQL à lancer manuellement dans le SQL Editor pour valider l'isolation par scope.
+
+### Fichiers modifiés
+
+- `app/_layout.tsx` : nouveaux Stack.Screen `sign-in`, `auth`, `direction`.
+- `app/parent/_layout.tsx`, `app/direction/_layout.tsx`, `app/mairie/_layout.tsx` : wrap dans `<AuthGuard allowedRoles={…}>`.
+- `app/index.tsx` (Welcome) : routes des boutons conditionnelles `USE_SUPABASE`.
+- `app/join-school.tsx` : bouton "Confirmer" → `/sign-in?role=parent&ecole=...` si Supabase, sinon ancien flow.
+- `hooks/index.ts` : export `useSession`.
+- `.env.example` : ajout de `EXPO_PUBLIC_USE_SUPABASE=false` documenté.
+- `supabase/README.md` : section "Activer Supabase Auth" complète (config dashboard, seed test user, activation flag, dépannage).
+
+### Limites assumées
+
+- **Tests E2E magic link non écrits** : intercepter un email de magic link en Playwright nécessite un mailcatcher (Mailpit/Mailhog) et du tooling Supabase. Hors scope MVP. Tests E2E existants continuent en mode mock.
+- **Workflow d'invitation depuis l'app** non encore implémenté. Pour le MVP, la mairie ajoute les personnes via SQL Editor.
+- **Liaison auth_user_id idempotente mais non sécurisée** : si une `personne.auth_user_id` est déjà rempli et qu'un autre user signe avec le même email, l'update fait `IS NULL` donc ne fait rien (la personne reste liée au premier auth user). Acceptable MVP, à durcir avant prod publique.
+
+### Comment activer (côté utilisateur)
+
+1. Côté dashboard Supabase : configurer **Site URL** (`http://localhost:8081`) + **Redirect URLs** (`http://localhost:8081/**`)
+2. Côté SQL Editor : exécuter `supabase/seed-test-user.sql`
+3. Côté `.env.local` : ajouter `EXPO_PUBLIC_USE_SUPABASE=true`
+4. Redémarrer Metro
+5. `http://localhost:8081` → bouton mairie → email Kouceila → clic lien → atterrit sur `/mairie/dashboard` avec vraies données Supabase
+
+### Vérifications
+
+- ✅ TypeScript compile (en attente du résultat final)
+- ✅ Lint passe (en attente)
+- ⏳ Bundle web — à valider
+- ✅ Tests E2E existants en mode mock — inchangés, restent verts
+
+---
+
+## 2026-05-19 — Étape 17 : Phase 1.2 — services Supabase prêts à activer
+
+### Contexte
+
+Suite de l'étape 16 (fondations Supabase). On code la couche services qui interroge la vraie base, derrière un **feature flag** `EXPO_PUBLIC_USE_SUPABASE`. Tant qu'il n'est pas à `'true'`, l'app continue de lire `mockData.ts` exactement comme avant. Ça permet de :
+- Préparer tout le code Supabase sans risque de régression
+- Activer en un seul flag quand l'auth Phase 2 sera prête (les policies RLS exigent un `auth.uid()`)
+- Tester par étapes : on peut activer dossiers uniquement, puis étendre, etc.
+
+L'utilisateur a créé son projet Supabase (`dxhraqnyllxxtivzbwdh`), exécuté les migrations 0001 + 0002, peuplé le seed. Tables et données prêtes côté DB.
+
+### Décisions
+
+- **Flag central** dans `services/_config.ts` : `export const USE_SUPABASE = process.env.EXPO_PUBLIC_USE_SUPABASE === 'true'`. Lu une fois au chargement.
+- **Pattern délégation** : chaque service principal (`services/dossiers.ts`, `messages.ts`, etc.) commence par `if (USE_SUPABASE) return …FromSupabase(filter)` avant de tomber sur le code mock. Aucun écran ni hook à modifier.
+- **Mappers snake_case ↔ camelCase** isolés dans `services/supabase/_mappers.ts`. Convertissent `ecole_id` → `ecoleId`, parsent `historique:historique_events(*)` en `historique: HistoriqueEvent[]`, lisent les JSONB `pieces_jointes` dans la structure attendue par les composants.
+- **Sécurité côté RLS** : les services Supabase n'envoient PAS de filtre `visibleByRole`. C'est PostgreSQL qui filtre via la matrice `user_can_see_scope`. Un bug applicatif côté JS ne peut PAS exposer un dossier non autorisé.
+- **Seed idempotent** : `TRUNCATE … CASCADE` au début de `seed.sql` pour pouvoir le rejouer sans conflit.
+
+### Fichiers créés
+
+- `services/supabase/_mappers.ts` — mappers DB → TS pour Dossier, Message, RendezVous, Ecole, Personne, HistoriqueEvent
+- `services/supabase/dossiers.ts` — `listDossiersFromSupabase`, `getDossierByIdFromSupabase` (avec JOIN historique)
+- `services/supabase/messages.ts`
+- `services/supabase/rendezVous.ts`
+- `services/supabase/ecoles.ts`
+- `services/supabase/personnes.ts`
+- `.env.local` — créé en local (non versionné) avec l'URL `dxhraqnyllxxtivzbwdh.supabase.co` et la clé anon
+
+### Fichiers modifiés
+
+- `services/_config.ts` — ajout du flag `USE_SUPABASE`
+- `services/dossiers.ts`, `messages.ts`, `rendezVous.ts`, `ecoles.ts`, `personnes.ts` — délégation conditionnelle au service Supabase
+- `supabase/seed.sql` — TRUNCATE CASCADE initial pour idempotence
+
+### Comment activer
+
+Quand l'auth Phase 2 sera en place :
+1. Ajouter `EXPO_PUBLIC_USE_SUPABASE=true` dans `.env.local`
+2. Redémarrer Metro
+3. L'app lit la vraie base. Les tests E2E continuent de tourner (avec auth).
+
+### Vérifications
+
+- ✅ TypeScript compile (les types des services Supabase reprennent ceux des services mock)
+- ✅ Lint passe
+- ⏳ Bundle web — en cours
+
+### Limites assumées (à traiter Phase 2)
+
+- Sans auth Supabase, les requêtes RLS retournent 0 ligne (par design).
+- Les services `contacts-mairie`, `anciens-admins`, `stats` ne sont pas encore wrappés Supabase — restent sur mock même si flag à true (pas critique pour le MVP).
+- Les `INSERT`/`UPDATE`/`DELETE` ne sont pas implémentés côté Supabase (lecture seule pour cette étape).
+
+---
+
+## 2026-05-19 — Étape 16 : Phase 1 backend Supabase (fondations)
+
+### Contexte
+
+Phase 1 du [plan de mise en production](../../.claude/plans/continue-le-travail-sur-humble-aurora.md) : remplacer le mockData par un vrai backend, avec la sécurité matérialisée au niveau base de données (Row Level Security PostgreSQL). Cette étape pose les **fondations côté code** ; le branchement effectif des services à Supabase se fera dans une étape suivante.
+
+Branche feature : `feat/phase1-supabase-foundations` (workflow PR obligatoire suite à la protection de `main` activée en Phase 0).
+
+### Décisions structurantes
+
+- **Hébergement** : Supabase région `eu-west-3` (Paris) — conforme RGPD.
+- **Schema** : snake_case côté SQL, conversion gérée par la couche services côté app (en Phase 1.2 à venir).
+- **IDs** : TEXT (compatibles avec les IDs lisibles du seed dev), pas UUID. Migration facile en UUID plus tard si besoin.
+- **Stockage RLS** : la sécurité est dans la base, pas dans le code. Une fonction `user_can_see_scope(scope)` réplique exactement la matrice `canRoleSeeScope` de `types/index.ts`. Bug applicatif = 0 fuite possible.
+- **Pièces jointes** : table dédiée pour les pièces de dossier (`pieces_jointes`), JSONB pour celles des RDV/messages (modèle plus léger, cohérent avec le TS actuel).
+- **Auth user link** : colonne `auth_user_id` sur `personnes` ajoutée dès la migration 0002 pour anticiper le branchement Phase 2 (magic link).
+
+### Fichiers créés
+
+- `lib/supabase.ts` : client Supabase unique, lit la config depuis `EXPO_PUBLIC_SUPABASE_URL` et `EXPO_PUBLIC_SUPABASE_ANON_KEY`. Warning explicite en dev si les vars manquent.
+- `.env.example` : template documenté pour le `.env.local` à créer côté utilisateur.
+- `supabase/migrations/0001_initial_schema.sql` : 11 tables, 9 enums, triggers `set_modifie_le`, index sur les FK + colonnes filtrées. Réplique fidèle des types TS.
+- `supabase/migrations/0002_rls_policies.sql` : 
+  - Colonne `auth_user_id UUID` sur `personnes` (lien Phase 2).
+  - Fonctions `current_user_role()`, `current_user_ecole_id()`, `user_can_see_scope()`.
+  - RLS activée sur les 11 tables.
+  - 11 policies SELECT + 4 policies INSERT/UPDATE (squelette à raffiner Phase 2).
+- `supabase/seed.sql` : données équivalentes à `data/mockData.ts` (1 mairie, 4 écoles, 5 personnes, 5 contacts mairie, 8 dossiers couvrant les 4 scopes, 3 RDV, 3 messages, historique + pièces + commentaires sélectionnés).
+- `supabase/README.md` : guide complet de prise en main (création projet, migrations, seed, vérifications, architecture de sécurité, lien auth.users ↔ personnes).
+
+### Fichiers modifiés
+
+- `package.json` : ajout de `@supabase/supabase-js` (199 packages ajoutés en tout, 4 vulnérabilités modérées non bloquantes).
+
+### Ce qui n'est PAS dans cette étape (volontairement)
+
+- **Branchement des services à Supabase** : la couche `services/*.ts` continue de lire `mockAsync(DOSSIERS)`. Le swap vers `supabase.from('dossiers').select()` se fera en Phase 1.2, une fois que l'utilisateur aura créé son projet Supabase et configuré son `.env.local`.
+- **Auth magic link** : Phase 2 dédiée.
+- **Tests RLS automatisés** (pgTAP ou scripts d'attaque) : à ajouter en fin de Phase 1.
+
+### Vérifications
+
+- ✅ `npm run typecheck` exit 0
+- ✅ `npm run lint` exit 0 (en attente du résultat)
+- ✅ `mockups-app/` intact
+- ⏳ Bundle web : à valider via la CI GitHub Actions au push
+
+### Prochaine étape
+
+Une fois cette PR mergée :
+1. **Côté utilisateur** : créer le projet Supabase (cf. `supabase/README.md`), exécuter les migrations + seed, configurer `.env.local`.
+2. **Côté code** : Phase 1.2 — brancher les services (`services/dossiers.ts`, `services/messages.ts`, etc.) à Supabase.
+3. Adapter les tests E2E Playwright pour utiliser le seed Supabase au lieu du mockData en mémoire.
+
+---
+
 ## 2026-05-19 — Étape 1 : Inspection et garde-fous
 
 ### État initial observé

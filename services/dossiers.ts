@@ -1,7 +1,8 @@
 import type { Dossier, Role, StatutDossier, VisibilityScope } from '../types';
 import { canRoleSeeScope } from '../types';
 import { DOSSIERS, DOSSIERS_TEST_VISIBILITE } from '../data/mockData';
-import { mockAsync } from './_config';
+import { mockAsync, USE_SUPABASE } from './_config';
+import { getDossierByIdFromSupabase, listDossiersFromSupabase } from './supabase/dossiers';
 
 export interface DossierFilter {
   ecoleId?: string;
@@ -26,6 +27,7 @@ const OPEN_STATUTS: StatutDossier[] = [
 ];
 
 export function listDossiers(filter: DossierFilter = {}): Promise<Dossier[]> {
+  if (USE_SUPABASE) return listDossiersFromSupabase(filter);
   let result = DOSSIERS;
   if (filter.ecoleId) {
     result = result.filter((d) => d.ecoleId === filter.ecoleId);
@@ -50,6 +52,7 @@ export function listDossiers(filter: DossierFilter = {}): Promise<Dossier[]> {
 }
 
 export function getDossierById(id: string): Promise<Dossier | null> {
+  if (USE_SUPABASE) return getDossierByIdFromSupabase(id);
   const dossier =
     DOSSIERS.find((d) => d.id === id) ?? DOSSIERS_TEST_VISIBILITE.find((d) => d.id === id) ?? null;
   return mockAsync(dossier);
