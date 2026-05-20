@@ -5,6 +5,65 @@ Le projet web `mockups-app/` n'est jamais modifié.
 
 ---
 
+## 2026-05-20 — Étape 18b : Fix bugs auth (RPC ambiguous + RLS récursive) + instrumentation permanente
+
+### Contexte
+
+Au premier test du magic link en conditions réelles, l'utilisateur retombait systématiquement sur `/auth/no-access`. 3 itérations de fix aveugles ayant échoué, on a basculé sur une enquête méthodique (cf. plan "Plan d'enquête — bug auth no-access persistant").
+
+3 SELECT diagnostic dans le SQL Editor + une page `/auth/debug` côté app ont permis d'identifier précisément 2 bugs distincts :
+
+### Bug 1 — RPC `link_current_user_to_personne` : colonne `role` ambiguë
+
+Le `RETURNING id, role` du UPDATE dans la RPC retournait l'erreur `42702: column reference "role" is ambiguous` car `role` désignait à la fois la colonne de la table `personnes` ET le paramètre OUT de la fonction (déclarés dans `RETURNS TABLE(personne_id TEXT, role role_utilisateur)`).
+
+**Fix** : renommé les paramètres OUT en `personne_id` + `personne_role`, qualifié les colonnes avec `personnes.id` / `personnes.role`, et restructuré la fonction en `SELECT INTO` + `RETURN NEXT` pour éviter les comportements inattendus de `RETURN QUERY + IF FOUND`.
+
+### Bug 2 — Policy SELECT `personnes` : récursion infinie
+
+La policy SELECT sur `personnes` faisait `EXISTS (SELECT 1 FROM personnes me WHERE ...)`. Chaque évaluation de la policy déclenchait la re-évaluation sur la sous-requête → boucle infinie détectée par PostgreSQL : `"infinite recursion detected in policy for relation personnes"`.
+
+**Fix** : remplacer les sous-requêtes EXISTS par des appels aux fonctions `public.current_user_ecole_id()` et `public.current_user_role()` qui sont déjà `SECURITY DEFINER` (migration 0002). Étant SECURITY DEFINER, elles bypass RLS → plus de récursion.
+
+### Instrumentation permanente (livrée avec le fix)
+
+Pour ne plus jamais se retrouver dans le noir :
+
+- **`app/auth/callback.tsx`** : logs `[auth/callback]` en `__DEV__` à chaque étape (session, RPC, linked). Passe `?reason=...&detail=...` en query param à `/auth/no-access` pour traçabilité.
+- **`app/auth/no-access.tsx`** : affiche un encart rouge "Diagnostic dev" en `__DEV__` avec le reason et le détail, plus un bouton vers `/auth/debug`.
+- **`app/auth/debug.tsx`** (nouveau) : page diagnostic accessible via `/auth/debug` qui exécute 4 vérifications en clair (session, RPC, SELECT personnes, count dossiers) et affiche le résultat brut. Compilée uniquement en `__DEV__`.
+- **`supabase/tests/auth-diagnostic.sql`** (nouveau) : 3 blocs SQL à coller dans le SQL Editor pour reproduire le diagnostic à la demande.
+
+### Migration versionnée
+
+- **`supabase/migrations/0003_auth_link_rpc.sql`** : nouvelle migration qui contient la RPC fixée + la policy `personnes_select` sans récursion. Désormais, la fonction survit à un `supabase db reset`.
+
+### Fichiers concernés
+
+| Fichier | Action |
+| --- | --- |
+| `supabase/migrations/0003_auth_link_rpc.sql` | **Nouveau** — RPC + policy versionnées |
+| `supabase/tests/auth-diagnostic.sql` | **Nouveau** — 3 SELECTs diagnostic |
+| `app/auth/callback.tsx` | Modifié — logging + reason param |
+| `app/auth/no-access.tsx` | Modifié — affichage diagnostic en `__DEV__` |
+| `app/auth/debug.tsx` | **Nouveau** — page diagnostic |
+| `CHANGELOG_MOBILE.md` | Cet ajout |
+
+### Vérifications
+
+- ✅ TypeScript compile
+- ✅ Bug 1 confirmé fixé via simulation SQL avec JWT mock dans SQL Editor (`SELECT * FROM link_current_user_to_personne()` retourne `personne-kouceila` + `mairie_admin`)
+- ✅ Bug 2 confirmé fixé via page `/auth/debug` (bloc 3 passe ✅ vert au lieu de l'erreur récursion)
+- ⏳ Test end-to-end magic link bloqué temporairement par rate limit Supabase free tier (2 OTPs/h/email). À retester quand le compteur retombe.
+
+### Bonnes pratiques tirées de cette session
+
+- **Ne jamais déclarer un paramètre OUT de fonction avec un nom qui existe en colonne dans la même table.** Préfixer (`personne_id`, `personne_role`).
+- **Les policies RLS ne doivent jamais faire de SELECT direct sur la même table.** Utiliser des fonctions `SECURITY DEFINER` qui bypass RLS.
+- **Instrumentation systématique des points sensibles** : `console.log` traçables en `__DEV__` + page debug dédiée. Coût marginal, gain énorme quand un bug apparaît.
+
+---
+
 ## 2026-05-20 — Étape 18 : Phase 2 — Auth magic link + guards de route
 
 ### Contexte

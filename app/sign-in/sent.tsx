@@ -110,9 +110,9 @@ export default function SignInSentScreen() {
             label="Changer d'email"
             onPress={() =>
               router.replace({
-                pathname: '/sign-in' as Href,
+                pathname: '/sign-in',
                 params: { role, ecole },
-              })
+              } as Href)
             }
             variant="ghost"
           />

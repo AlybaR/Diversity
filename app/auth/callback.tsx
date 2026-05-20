@@ -1,23 +1,21 @@
 /**
  * Écran callback magic link.
  *
- * Quand Supabase Auth a posé la session (via le hash #access_token=… détecté
- * automatiquement par detectSessionInUrl), ce composant :
- *   1. Attend que la session soit chargée
- *   2. Cherche la personne par email
- *   3. Si trouvée : lie auth_user_id si pas déjà fait, redirige vers la zone du rôle
- *   4. Si pas trouvée : redirige vers /auth/no-access
+ * Étapes :
+ *   1. Récupère la session (Supabase a parsé le hash #access_token automatiquement)
+ *   2. Appelle la RPC `link_current_user_to_personne()` :
+ *      - retourne la personne déjà liée si auth_user_id rempli
+ *      - sinon match par email + UPDATE auth_user_id (en bypassant RLS via SECURITY DEFINER)
+ *   3. Redirige vers la zone du rôle, ou vers /auth/no-access avec un détail si KO
+ *
+ * Le détail d'erreur est passé en query param vers /auth/no-access pour que le
+ * mode __DEV__ puisse l'afficher : ça évite les diagnostics aveugles à l'avenir.
  */
 
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 import { router, type Href } from 'expo-router';
 import { supabase } from '../../lib/supabase';
-import {
-  findPersonneByAuthUserId,
-  findPersonneByEmail,
-  linkAuthToPersonne,
-} from '../../services/supabase/authLink';
 import type { Role } from '../../types';
 
 function redirectFromRole(role: Role): Href {
@@ -33,6 +31,18 @@ function redirectFromRole(role: Role): Href {
   }
 }
 
+interface LinkResult {
+  personne_id: string;
+  personne_role: Role;
+}
+
+function gotoNoAccess(reason: string, detail?: string) {
+  router.replace({
+    pathname: '/auth/no-access',
+    params: detail ? { reason, detail } : { reason },
+  } as Href);
+}
+
 export default function AuthCallbackScreen() {
   const [status, setStatus] = useState<string>('Vérification de la connexion…');
   const handled = useRef(false);
@@ -42,47 +52,54 @@ export default function AuthCallbackScreen() {
     handled.current = true;
 
     (async () => {
-      // 1. Récupère la session (Supabase a déjà parsé le hash de l'URL)
-      const { data: sessionData } = await supabase.auth.getSession();
+      // 1. Récupère la session
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
       const session = sessionData.session;
 
+      if (__DEV__) {
+        // eslint-disable-next-line no-console
+        console.log('[auth/callback] session', {
+          user_id: session?.user.id,
+          email: session?.user.email,
+          error: sessionError?.message,
+        });
+      }
+
       if (!session) {
-        // Le hash n'a pas été détecté ou la session a expiré → retour Welcome
-        setStatus('Session introuvable — redirection');
-        setTimeout(() => router.replace('/'), 800);
+        gotoNoAccess('no-session', sessionError?.message);
         return;
       }
 
-      const authUserId = session.user.id;
-      const email = session.user.email;
+      // 2. Appel RPC qui fait la liaison côté base (bypass RLS)
+      setStatus('Liaison du compte…');
+      const { data, error } = await supabase.rpc('link_current_user_to_personne');
 
-      // 2. Essayer de récupérer la personne déjà liée
-      setStatus('Récupération de ton profil…');
-      let personne = await findPersonneByAuthUserId(authUserId);
-
-      // 3. Si pas encore liée, on cherche par email et on relie
-      if (!personne && email) {
-        const personneByEmail = await findPersonneByEmail(email);
-        if (personneByEmail) {
-          setStatus('Première connexion — liaison du compte…');
-          try {
-            await linkAuthToPersonne(personneByEmail.id, authUserId);
-            personne = personneByEmail;
-          } catch (_err) {
-            // La liaison a échoué (peut-être déjà liée à un autre compte) → no-access
-            personne = null;
-          }
-        }
+      if (__DEV__) {
+        // eslint-disable-next-line no-console
+        console.log('[auth/callback] rpc result', { data, error: error?.message });
       }
 
-      // 4. Si toujours pas de personne → accès refusé
-      if (!personne) {
-        router.replace('/auth/no-access' as Href);
+      if (error) {
+        gotoNoAccess('rpc-error', error.message);
         return;
       }
 
-      // 5. Redirection selon le rôle
-      router.replace(redirectFromRole(personne.role));
+      // La RPC retourne un set of rows. Selon Supabase JS le typage peut varier.
+      const rows = (Array.isArray(data) ? data : data ? [data] : []) as LinkResult[];
+      const linked = rows.length > 0 ? rows[0] : null;
+
+      if (__DEV__) {
+        // eslint-disable-next-line no-console
+        console.log('[auth/callback] linked', linked);
+      }
+
+      if (!linked) {
+        gotoNoAccess('email-not-found', `Aucune personne ne correspond à ${session.user.email}`);
+        return;
+      }
+
+      // 3. Redirection selon le rôle
+      router.replace(redirectFromRole(linked.personne_role));
     })();
   }, []);
 

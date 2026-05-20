@@ -68,9 +68,9 @@ export default function SignInScreen() {
 
     // On passe l'email à l'écran "sent" pour pouvoir le réafficher / renvoyer
     router.push({
-      pathname: '/sign-in/sent' as Href,
+      pathname: '/sign-in/sent',
       params: { email, role: roleHint, ecole },
-    });
+    } as Href);
   };
 
   return (
