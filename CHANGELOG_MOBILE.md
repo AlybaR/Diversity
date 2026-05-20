@@ -5,6 +5,62 @@ Le projet web `mockups-app/` n'est jamais modifié.
 
 ---
 
+## 2026-05-19 — Étape 17 : Phase 1.2 — services Supabase prêts à activer
+
+### Contexte
+
+Suite de l'étape 16 (fondations Supabase). On code la couche services qui interroge la vraie base, derrière un **feature flag** `EXPO_PUBLIC_USE_SUPABASE`. Tant qu'il n'est pas à `'true'`, l'app continue de lire `mockData.ts` exactement comme avant. Ça permet de :
+- Préparer tout le code Supabase sans risque de régression
+- Activer en un seul flag quand l'auth Phase 2 sera prête (les policies RLS exigent un `auth.uid()`)
+- Tester par étapes : on peut activer dossiers uniquement, puis étendre, etc.
+
+L'utilisateur a créé son projet Supabase (`dxhraqnyllxxtivzbwdh`), exécuté les migrations 0001 + 0002, peuplé le seed. Tables et données prêtes côté DB.
+
+### Décisions
+
+- **Flag central** dans `services/_config.ts` : `export const USE_SUPABASE = process.env.EXPO_PUBLIC_USE_SUPABASE === 'true'`. Lu une fois au chargement.
+- **Pattern délégation** : chaque service principal (`services/dossiers.ts`, `messages.ts`, etc.) commence par `if (USE_SUPABASE) return …FromSupabase(filter)` avant de tomber sur le code mock. Aucun écran ni hook à modifier.
+- **Mappers snake_case ↔ camelCase** isolés dans `services/supabase/_mappers.ts`. Convertissent `ecole_id` → `ecoleId`, parsent `historique:historique_events(*)` en `historique: HistoriqueEvent[]`, lisent les JSONB `pieces_jointes` dans la structure attendue par les composants.
+- **Sécurité côté RLS** : les services Supabase n'envoient PAS de filtre `visibleByRole`. C'est PostgreSQL qui filtre via la matrice `user_can_see_scope`. Un bug applicatif côté JS ne peut PAS exposer un dossier non autorisé.
+- **Seed idempotent** : `TRUNCATE … CASCADE` au début de `seed.sql` pour pouvoir le rejouer sans conflit.
+
+### Fichiers créés
+
+- `services/supabase/_mappers.ts` — mappers DB → TS pour Dossier, Message, RendezVous, Ecole, Personne, HistoriqueEvent
+- `services/supabase/dossiers.ts` — `listDossiersFromSupabase`, `getDossierByIdFromSupabase` (avec JOIN historique)
+- `services/supabase/messages.ts`
+- `services/supabase/rendezVous.ts`
+- `services/supabase/ecoles.ts`
+- `services/supabase/personnes.ts`
+- `.env.local` — créé en local (non versionné) avec l'URL `dxhraqnyllxxtivzbwdh.supabase.co` et la clé anon
+
+### Fichiers modifiés
+
+- `services/_config.ts` — ajout du flag `USE_SUPABASE`
+- `services/dossiers.ts`, `messages.ts`, `rendezVous.ts`, `ecoles.ts`, `personnes.ts` — délégation conditionnelle au service Supabase
+- `supabase/seed.sql` — TRUNCATE CASCADE initial pour idempotence
+
+### Comment activer
+
+Quand l'auth Phase 2 sera en place :
+1. Ajouter `EXPO_PUBLIC_USE_SUPABASE=true` dans `.env.local`
+2. Redémarrer Metro
+3. L'app lit la vraie base. Les tests E2E continuent de tourner (avec auth).
+
+### Vérifications
+
+- ✅ TypeScript compile (les types des services Supabase reprennent ceux des services mock)
+- ✅ Lint passe
+- ⏳ Bundle web — en cours
+
+### Limites assumées (à traiter Phase 2)
+
+- Sans auth Supabase, les requêtes RLS retournent 0 ligne (par design).
+- Les services `contacts-mairie`, `anciens-admins`, `stats` ne sont pas encore wrappés Supabase — restent sur mock même si flag à true (pas critique pour le MVP).
+- Les `INSERT`/`UPDATE`/`DELETE` ne sont pas implémentés côté Supabase (lecture seule pour cette étape).
+
+---
+
 ## 2026-05-19 — Étape 16 : Phase 1 backend Supabase (fondations)
 
 ### Contexte

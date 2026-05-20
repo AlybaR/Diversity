@@ -8,6 +8,20 @@
  * Les hooks `hooks/use*.ts` (basés sur React Query) ne nécessiteront aucun changement.
  */
 
+/**
+ * Bascule mock data ↔ Supabase.
+ *
+ * Lit la variable d'env `EXPO_PUBLIC_USE_SUPABASE` :
+ *   - `'true'`  → les services utilisent Supabase (Phase 1.2+)
+ *   - autre/absent → mockData en mémoire (comportement par défaut, Phase 0/1.1)
+ *
+ * Notes :
+ *   - Le flag est lu UNE FOIS au chargement de l'app. Pour le changer, redémarrer Metro.
+ *   - Tant que l'auth Phase 2 n'est pas branchée, les requêtes Supabase échoueront sur
+ *     les tables protégées par RLS (renvoient 0 ligne). Passer à `'true'` après auth.
+ */
+export const USE_SUPABASE = process.env.EXPO_PUBLIC_USE_SUPABASE === 'true';
+
 /** Délai artificiel (ms) pour simuler la latence réseau. 0 = instantané. */
 export const MOCK_LATENCY_MS = 0;
 

@@ -26,8 +26,8 @@ if (!supabaseUrl || !supabaseAnonKey) {
   // En prod (bundle minifié), ce warning sera silencieux mais les requêtes échoueront proprement.
   if (__DEV__) {
     console.warn(
-      "[Supabase] EXPO_PUBLIC_SUPABASE_URL ou EXPO_PUBLIC_SUPABASE_ANON_KEY manquant. " +
-        "Crée un fichier `.env.local` à la racine de mobile-app/ (cf. .env.example).",
+      '[Supabase] EXPO_PUBLIC_SUPABASE_URL ou EXPO_PUBLIC_SUPABASE_ANON_KEY manquant. ' +
+        'Crée un fichier `.env.local` à la racine de mobile-app/ (cf. .env.example).',
     );
   }
 }
