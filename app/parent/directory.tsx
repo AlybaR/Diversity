@@ -19,7 +19,7 @@ import { PrimaryButton } from '../../components/PrimaryButton';
 import { SecondaryButton } from '../../components/SecondaryButton';
 import { TextInputField } from '../../components/TextInputField';
 import { ANCIENS_ADMINS, CATEGORIES, CONTACTS_MAIRIE, ECOLES } from '../../data/mockData';
-import { usePersonnes } from '../../hooks';
+import { useCreatePersonne, usePersonnes } from '../../hooks';
 import type { ContactMairie } from '../../types';
 
 type DirectoryTab = 'parents' | 'mairie' | 'anciens';
@@ -71,36 +71,54 @@ function MairieContactCard({ contact }: { contact: ContactMairie }) {
 
 export default function DirectoryScreen() {
   const { data: representants = [] } = usePersonnes({ representantsOnly: true });
+  const createPersonne = useCreatePersonne();
   const [activeTab, setActiveTab] = useState<DirectoryTab>('parents');
   const [modalOpen, setModalOpen] = useState(false);
   const [prenom, setPrenom] = useState('');
+  const [nom, setNom] = useState('');
   const [email, setEmail] = useState('');
   const [invitationLink, setInvitationLink] = useState('');
   const ecole = ECOLES[0];
   const representantsActifs = representants.filter((personne) => personne.actif);
 
   const handleGenerate = () => {
-    if (prenom.trim().length < 2 || !email.includes('@')) {
-      Alert.alert('Invitation incomplète', 'Ajoutez au minimum un prénom et une adresse email.');
+    if (prenom.trim().length < 2 || nom.trim().length < 2 || !email.includes('@')) {
+      Alert.alert('Invitation incomplète', 'Renseigne au minimum prénom, nom et adresse email.');
       return;
     }
     const token = Math.random().toString(36).slice(2, 8).toUpperCase();
-    setInvitationLink(`https://autour-ecole.example/invitation/JAURES-${token}`);
+    setInvitationLink(`https://passerelle-demo.pages.dev/invitation/JAURES-${token}`);
   };
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!invitationLink) {
       handleGenerate();
       return;
     }
-    setModalOpen(false);
-    setPrenom('');
-    setEmail('');
-    setInvitationLink('');
-    Alert.alert(
-      'Invitation prête',
-      "Le lien d'invitation sera envoyé par email dès que le service d'envoi sera connecté.",
-    );
+    try {
+      await createPersonne.mutateAsync({
+        prenom,
+        nom,
+        email,
+        role: 'parent_contributeur',
+        ecoleId: ecole.id,
+        association: 'Parents Indépendants',
+      });
+      setModalOpen(false);
+      setPrenom('');
+      setNom('');
+      setEmail('');
+      setInvitationLink('');
+      Alert.alert(
+        'Invitation envoyée',
+        `${prenom} ${nom} a été ajouté à l'annuaire de ${ecole.nom}. La personne apparaît immédiatement dans la liste des représentants et dans le sélecteur de mode démo.`,
+      );
+    } catch (err) {
+      Alert.alert(
+        'Erreur',
+        err instanceof Error ? err.message : "Impossible d'ajouter la personne.",
+      );
+    }
   };
 
   return (
@@ -267,12 +285,24 @@ export default function DirectoryScreen() {
             </View>
 
             <View className="gap-4">
-              <TextInputField
-                label="Prénom"
-                placeholder="Ex : Samira"
-                value={prenom}
-                onChangeText={setPrenom}
-              />
+              <View className="flex-row gap-3">
+                <View className="flex-1">
+                  <TextInputField
+                    label="Prénom"
+                    placeholder="Samira"
+                    value={prenom}
+                    onChangeText={setPrenom}
+                  />
+                </View>
+                <View className="flex-1">
+                  <TextInputField
+                    label="Nom"
+                    placeholder="Hamadi"
+                    value={nom}
+                    onChangeText={setNom}
+                  />
+                </View>
+              </View>
               <TextInputField
                 label="Email"
                 placeholder="prenom.nom@example.org"

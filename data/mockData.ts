@@ -852,3 +852,48 @@ export const STATS_MAIRIE = {
   dossiersTraitesMois: 12,
   deltaDossiersTraitesMois: 3,
 };
+
+// =============================================================================
+// Reset démo : snapshot initial des arrays mutables
+// =============================================================================
+// Capturé à l'init du module. resetMockData() vide les arrays et les
+// re-remplit depuis le snapshot. Utilisé par le bouton "Réinitialiser démo"
+// dans le profil pour repartir d'un état frais entre 2 présentations.
+//
+// On clone profondément pour que les mutations sur les items (ex:
+// dossier.nbCommentaires += 1) ne polluent pas le snapshot.
+
+function deepClone<T>(value: T): T {
+  // structuredClone est dispo dans Hermes (RN) et tous les navigateurs modernes.
+  // Fallback JSON si jamais (les Date → string, ok pour notre cas).
+  if (typeof structuredClone === 'function') {
+    return structuredClone(value);
+  }
+  return JSON.parse(JSON.stringify(value));
+}
+
+const _INITIAL_SNAPSHOT = {
+  dossiers: deepClone(DOSSIERS),
+  messages: deepClone(MESSAGES),
+  rendezVous: deepClone(RENDEZ_VOUS),
+  personnes: deepClone(PERSONNES),
+};
+
+/**
+ * Réinitialise les arrays mock à leur état d'origine (snapshot capturé au
+ * chargement). À appeler en mode démo entre 2 présentations.
+ *
+ * Ne touche pas à `_currentUser` (le sélecteur de personnage est géré par
+ * useDemoUser, indépendant). Caller doit penser à appeler queryClient
+ * .invalidateQueries() pour forcer le refetch des listes.
+ */
+export function resetMockData(): void {
+  DOSSIERS.length = 0;
+  DOSSIERS.push(...deepClone(_INITIAL_SNAPSHOT.dossiers));
+  MESSAGES.length = 0;
+  MESSAGES.push(...deepClone(_INITIAL_SNAPSHOT.messages));
+  RENDEZ_VOUS.length = 0;
+  RENDEZ_VOUS.push(...deepClone(_INITIAL_SNAPSHOT.rendezVous));
+  PERSONNES.length = 0;
+  PERSONNES.push(...deepClone(_INITIAL_SNAPSHOT.personnes));
+}

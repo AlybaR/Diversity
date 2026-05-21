@@ -30,19 +30,21 @@ import {
   HelpCircle,
   LogOut,
   Mail,
+  RefreshCw,
   Scale,
   ShieldCheck,
   Trash2,
   Users,
   X,
 } from 'lucide-react-native';
+import { useQueryClient } from '@tanstack/react-query';
 import { BottomNav } from '../../components/BottomNav';
 import { DemoPersonneSelector } from '../../components/DemoPersonneSelector';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { SecondaryButton } from '../../components/SecondaryButton';
 import { TextInputField } from '../../components/TextInputField';
 import { COLORS, GRADIENTS } from '../../constants/theme';
-import { ECOLES, MAIRIE, UTILISATEUR_COURANT } from '../../data/mockData';
+import { ECOLES, MAIRIE, UTILISATEUR_COURANT, resetMockData } from '../../data/mockData';
 import { useSession } from '../../hooks/useSession';
 import { addBreadcrumb, captureMessage } from '../../lib/sentry';
 import { USE_SUPABASE } from '../../services/_config';
@@ -104,6 +106,29 @@ export default function ParentProfileScreen() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [confirmText, setConfirmText] = useState('');
   const [demoOpen, setDemoOpen] = useState(false);
+  const queryClient = useQueryClient();
+
+  const handleResetDemo = () => {
+    Alert.alert(
+      'Réinitialiser la démo ?',
+      "Toutes les données créées pendant cette session (dossiers, messages, RDV, personnes ajoutées) vont être supprimées et l'app va revenir à son état initial. L'utilisateur courant reste inchangé.",
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Réinitialiser',
+          style: 'destructive',
+          onPress: () => {
+            resetMockData();
+            queryClient.invalidateQueries();
+            Alert.alert(
+              'Démo réinitialisée',
+              "Les listes ont été restaurées à l'état d'origine. Tu peux relancer ta présentation depuis un état propre.",
+            );
+          },
+        },
+      ],
+    );
+  };
 
   const handleExport = () => {
     addBreadcrumb({ category: 'rgpd', message: 'export-requested', data: { personne_id: me.id } });
@@ -238,7 +263,7 @@ export default function ParentProfileScreen() {
           destructive
         />
 
-        {/* Mode démo : sélecteur de personnage (visible uniquement en mode mock) */}
+        {/* Mode démo : sélecteur de personnage + reset (visible uniquement en mode mock) */}
         {!USE_SUPABASE && (
           <>
             <SectionTitle>Mode démo</SectionTitle>
@@ -248,6 +273,13 @@ export default function ParentProfileScreen() {
               title="Changer de personnage"
               subtitle="Tester l’app sous un autre rôle (parent, mairie, direction)"
               onPress={() => setDemoOpen(true)}
+            />
+            <Row
+              icon={<RefreshCw color={COLORS.warning[600]} size={18} />}
+              iconBg="bg-warning-50"
+              title="Réinitialiser la démo"
+              subtitle="Restaurer l’état initial entre 2 présentations"
+              onPress={handleResetDemo}
             />
           </>
         )}
