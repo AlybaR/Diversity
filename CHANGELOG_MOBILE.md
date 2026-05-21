@@ -1706,6 +1706,75 @@ visuel. TypeScript clean, lint clean.
 
 ---
 
+## 2026-05-21 — Étape 15.F : Audits routes + sécurité + documentation finale
+
+### Audits effectués
+
+#### Routes Expo Router (pointeurs morts)
+- 30 routes string literal référencées dans `router.push('...')` : **toutes existent** dans `app/`
+- 9 routes object form référencées dans `router.push({ pathname })` : **toutes existent**
+- 0 navigation cassée
+- Méthode : grep `router\.(push|replace)\(['\"\\`]/` + `pathname:` puis diff avec `find app/ -name '*.tsx'`
+
+#### Sécurité — secrets en dur
+- Grep `(api[_-]?key|secret|password|token|bearer)[ \t]*[=:][ \t]*['\"][a-zA-Z0-9_\\-]{20,}` : **aucun résultat**
+- Grep `eyJ[A-Za-z0-9_\\-]{10,}` (JWT pattern) : 1 résultat dans `supabase/README.md` ligne 42 (exemple tronqué `eyJhbGciOiJIUzI1NiIs...` à des fins de documentation, non sensible)
+- `.env.local` contient les vrais tokens, ignoré par `.gitignore` (vérifié dans Étape 14)
+
+#### Dette latente (as any, @ts-ignore, etc.)
+- 0 occurrence dans le code applicatif
+
+### Documentation enrichie (`CONTRIBUTING.md`)
+
+Ajout de 2 sections avant "Tests" :
+
+1. **Pattern de données : services + hooks (React Query)** — explique le flow `écran → useDossiers() → dossiersService.listDossiers() → mockData/Supabase`, liste les imports `mockData` autorisés (enums, constants, helpers démo), procédure pour ajouter un hook ou une mutation, garantie de migration backend transparente.
+
+2. **Accessibilité** — rappelle que les composants partagés exposent déjà les attributs a11y et qu'on les utilise plutôt que de patcher chaque `<Pressable>` individuellement.
+
+### Bilan de cette extension de session (6 commits locaux totaux)
+
+```
+2b9556a docs(contributing): pattern services/hooks + a11y conventions
+5f13a17 feat(a11y): accessibilityLabel/Role/Hint sur les composants partages
+60ab0f9 refactor(data): migration mockData -> hooks finalisee
+08afb08 docs+refactor(demo): audit + migration 3 ecrans + sync TODO/README
+bd8ba3d feat(demo): navigation equipe + tour etendu + reset universel
+f2412ca feat(demo): annuaire editable cote direction + ecran equipe mairie
+```
+
+**Stats globales** : 21 fichiers modifiés, +1255 / -122 lignes.
+
+### Limites atteintes
+
+À ce stade, tout ce qui pouvait être fait **sans intervention de l'utilisateur** est fait :
+- ✅ Code applicatif : aucune dette, tous les écrans hookés correctement
+- ✅ Navigation : aucun pointeur mort
+- ✅ Sécurité : aucun secret en dur
+- ✅ Lint + TypeScript : 0 warning
+- ✅ Bundle web : OK
+- ✅ A11y : composants partagés conformes RGAA basique
+- ✅ Documentation : CONTRIBUTING + TODO + README synchronisés
+- ⏳ Push GitHub : bloqué par SSL dans la sandbox → à pousser manuellement
+- ⏳ Validation visuelle Chrome : impossible sans accès navigateur → à faire manuellement
+- ⏳ Activation Supabase : nécessite accès au projet Supabase → à faire manuellement
+- ⏳ Tests Jest : setup risqué sans validation locale → reporté
+
+### Prochaine action côté utilisateur
+
+```powershell
+cd "C:\Users\kouce\Desktop\Autour des parents\mobile-app"
+git push origin feat/demo-3-jours        # pousse les 6 commits
+npx expo start                            # valide visuellement
+```
+
+Puis :
+1. Suivre la checklist `TEST_SCENARIOS.md` pour valider les parcours principaux
+2. Quand prêt, appliquer les migrations Supabase + basculer `EXPO_PUBLIC_USE_SUPABASE=true`
+3. Lancer les tests E2E Playwright (`cd ../tests-e2e && npm run test:parents`)
+
+---
+
 ## 2026-05-21 — Étape 15.A : Commit annuaire éditable côté direction + équipe mairie
 
 ### Fichiers modifiés
