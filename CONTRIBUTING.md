@@ -105,6 +105,46 @@ Le modèle de visibilité par canal (`VisibilityScope`) est défini dans [`types
 - Les services qui listent des données DOIVENT filtrer via `visibleByRole`.
 - Tests E2E de sécurité côté URL directe → `tests-e2e/tests/parents/parents.spec.ts` (section "3. Sécurité").
 
+### Pattern de données : services + hooks (React Query)
+
+Toutes les données consommées par les écrans passent par 3 couches :
+
+```
+écran → useDossiers(filter) ─→ dossiersService.listDossiers(filter) ─→ mockData OU Supabase
+        (hooks/)              (services/)                              (data/ ou backend)
+```
+
+**Règle d'or** : un écran n'importe JAMAIS directement les arrays mutables de `data/mockData.ts` (`DOSSIERS`, `MESSAGES`, `RENDEZ_VOUS`, `PERSONNES`). Il utilise un hook.
+
+**Imports `data/mockData` autorisés** (configuration et enums uniquement) :
+
+- Enums référentiels : `CATEGORIES`, `URGENCES`, `STATUTS_DOSSIER`, `CONTACTS_MAIRIE`, `ANCIENS_ADMINS`, `COMMENTAIRES_DOSSIER`, `PIECES_JOINTES`
+- Constants singleton : `MAIRIE`, `UTILISATEUR_COURANT`
+- Helpers démo : `resetMockData`, `setCurrentUser`, `getCurrentUser`
+- Identifiants config invariante au top-level : `const DIRECTION = PERSONNES.find(p => p.role === 'direction')` dans les écrans `direction/*`
+
+**Pour ajouter un nouvel hook** :
+
+1. Ajouter la fonction async dans `services/<entity>.ts` (signature `Promise<T>` même en mock)
+2. Ajouter une clé dans `services/_config.ts` → `QUERY_KEYS`
+3. Créer le hook dans `hooks/use<Entity>.ts` qui appelle `useQuery({ queryKey, queryFn })`
+4. Exporter depuis `hooks/index.ts`
+
+**Pour une mutation (créer/modifier)** :
+
+1. Ajouter la fonction `create<Entity>` / `update<Entity>` dans le service
+2. Créer un `useCreate<Entity>` qui wrappe `useMutation` + `onSuccess: () => queryClient.invalidateQueries(...)`
+3. L'invalidation propage l'update à tous les écrans qui consomment ces queries
+
+**Migration backend** : à l'arrivée de Supabase réel, seules les implémentations des services changent (`fetch()` au lieu de `mockAsync()`). Aucun écran ni hook ne doit être modifié.
+
+### Accessibilité
+
+- Les composants partagés (`PrimaryButton`, `SecondaryButton`, `BottomNav`, `TextInputField`) exposent `accessibilityLabel` / `accessibilityRole` / `accessibilityHint`. **À toujours préférer** plutôt qu'ajouter manuellement sur chaque `<Pressable>`.
+- Onglets BottomNav : pattern `« Accueil, onglet 1 sur 5 »` + `accessibilityState={{ selected: active }}`.
+- Boutons désactivés : `accessibilityState={{ disabled }}`.
+- À faire en Phase 6 : audit RGAA / WCAG avec axe-core ou Lighthouse une fois en production.
+
 ## Tests
 
 ### En local avant de pousser
