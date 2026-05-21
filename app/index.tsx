@@ -9,6 +9,7 @@ import { GRADIENTS } from '../constants/theme';
 import { USE_SUPABASE } from '../services/_config';
 import { DemoPersonneSelector } from '../components/DemoPersonneSelector';
 import { DemoQrCode } from '../components/DemoQrCode';
+import { TourStartCta } from '../components/TourStartCta';
 import { PERSONNES, setCurrentUser } from '../data/mockData';
 import type { Role } from '../types';
 
@@ -191,6 +192,9 @@ export default function WelcomeScreen() {
 
         {/* Boutons en bas */}
         <View className="px-6 pb-8 gap-3">
+          {/* CTA visite guidée (affiché si pas encore terminée) */}
+          <TourStartCta />
+
           <Pressable
             onPress={() => router.push('/join-school')}
             style={({ pressed }) => ({

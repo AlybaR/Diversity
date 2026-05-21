@@ -8,6 +8,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { PhoneFrame } from '../components/PhoneFrame';
 import { OfflineBanner } from '../components/OfflineBanner';
+import { TourBubble } from '../components/TourBubble';
 import { configureNotificationHandler } from '../lib/notifications';
 import { usePushRegistration } from '../hooks/usePushRegistration';
 
@@ -68,6 +69,8 @@ export default function RootLayout() {
                   <Stack.Screen name="aide" />
                   <Stack.Screen name="legal" />
                 </Stack>
+                {/* Bulle de visite guidée — overlays toutes les routes */}
+                <TourBubble />
               </View>
             </View>
           </PhoneFrame>
