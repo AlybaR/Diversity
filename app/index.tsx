@@ -3,11 +3,12 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, type Href } from 'expo-router';
-import { ChevronRight, HelpCircle, Shield, Sparkles, Users } from 'lucide-react-native';
+import { ChevronRight, HelpCircle, QrCode, Shield, Sparkles, Users } from 'lucide-react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { GRADIENTS } from '../constants/theme';
 import { USE_SUPABASE } from '../services/_config';
 import { DemoPersonneSelector } from '../components/DemoPersonneSelector';
+import { DemoQrCode } from '../components/DemoQrCode';
 import { PERSONNES, setCurrentUser } from '../data/mockData';
 import type { Role } from '../types';
 
@@ -107,6 +108,7 @@ function GraduationIcon({ size = 20 }: { size?: number }) {
 export default function WelcomeScreen() {
   const insets = useSafeAreaInsets();
   const [demoOpen, setDemoOpen] = useState(false);
+  const [qrOpen, setQrOpen] = useState(false);
   return (
     <LinearGradient
       colors={GRADIENTS.header as unknown as [string, string, ...string[]]}
@@ -281,19 +283,30 @@ export default function WelcomeScreen() {
             </Pressable>
           </View>
 
-          {/* Bouton Mode démo (visible uniquement en mode mock pour ne pas polluer la prod) */}
+          {/* Boutons démo (visibles uniquement en mode mock) */}
           {!USE_SUPABASE && (
-            <Pressable
-              onPress={() => setDemoOpen(true)}
-              hitSlop={6}
-              className="flex-row items-center justify-center gap-1.5 mt-3 self-center px-4 py-2 rounded-full border border-white/20"
-              style={{ backgroundColor: 'rgba(255,255,255,0.08)' }}
-            >
-              <Users size={12} color="rgba(255,255,255,0.7)" />
-              <Text className="text-white/70 text-[11px] font-medium">
-                Mode démo : tester un autre rôle
-              </Text>
-            </Pressable>
+            <View className="flex-row justify-center gap-2 mt-3 flex-wrap">
+              <Pressable
+                onPress={() => setDemoOpen(true)}
+                hitSlop={6}
+                className="flex-row items-center gap-1.5 px-4 py-2 rounded-full border border-white/20"
+                style={{ backgroundColor: 'rgba(255,255,255,0.08)' }}
+              >
+                <Users size={12} color="rgba(255,255,255,0.7)" />
+                <Text className="text-white/70 text-[11px] font-medium">
+                  Mode démo : tester un autre rôle
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setQrOpen(true)}
+                hitSlop={6}
+                className="flex-row items-center gap-1.5 px-4 py-2 rounded-full border border-white/20"
+                style={{ backgroundColor: 'rgba(255,255,255,0.08)' }}
+              >
+                <QrCode size={12} color="rgba(255,255,255,0.7)" />
+                <Text className="text-white/70 text-[11px] font-medium">QR code démo</Text>
+              </Pressable>
+            </View>
           )}
 
           {/* Mentions légales en bas, discret */}
@@ -314,6 +327,7 @@ export default function WelcomeScreen() {
       </ScrollView>
 
       <DemoPersonneSelector visible={demoOpen} onClose={() => setDemoOpen(false)} />
+      <DemoQrCode visible={qrOpen} onClose={() => setQrOpen(false)} />
     </LinearGradient>
   );
 }
