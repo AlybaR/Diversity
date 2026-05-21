@@ -9,19 +9,41 @@ Application mobile **Expo React Native + NativeWind + TypeScript** pour le proje
 
 ## Stack
 
+### Cœur
+
 - [Expo](https://expo.dev) SDK 54
-- [Expo Router](https://docs.expo.dev/router/introduction/) v6 (file-based routing)
+- [Expo Router](https://docs.expo.dev/router/introduction/) v6 (file-based routing, typed routes)
 - [React Native](https://reactnative.dev) 0.81
 - [NativeWind](https://www.nativewind.dev) v4 (Tailwind dans React Native)
 - TypeScript strict
+
+### Données & état
+
+- [`@tanstack/react-query`](https://tanstack.com/query) v5 — cache, loading/error states, mutations
+- [`@supabase/supabase-js`](https://supabase.com) v2 — backend Postgres + auth magic link + RLS (feature flag `EXPO_PUBLIC_USE_SUPABASE` — `false` par défaut = mode mock local)
+- `@react-native-async-storage/async-storage` — persistance session natif
+- `@react-native-community/netinfo` — détection offline
+
+### UI & animation
+
 - `expo-linear-gradient` pour les dégradés institutionnels
 - `expo-blur` pour les effets de transparence
 - `lucide-react-native` pour les icônes (parité avec la version web)
 - `react-native-svg` pour les SVG inline
-- `react-native-reanimated` + `react-native-worklets` pour les animations (pulse urgent)
+- `react-native-reanimated` + `react-native-worklets` pour les animations (pulse urgent, layout animations)
 - `react-native-safe-area-context` pour les zones de sécurité iOS/Android
-- `react-dom` + `react-native-web` + `@expo/metro-runtime` pour le mode web (`npx expo start --web`)
-- `babel-preset-expo` (devDep) pour la chaîne Babel Expo standard
+- `expo-notifications` — collecte des tokens Expo Push (Phase 5)
+
+### Web target (mode démo navigateur)
+
+- `react-dom` + `react-native-web` + `@expo/metro-runtime`
+- `PhoneFrame` simulateur iPhone activé automatiquement sur écrans ≥ 600 px
+
+### Outillage qualité
+
+- ESLint + Prettier (config Expo)
+- `babel-preset-expo` (devDep)
+- `cross-env` + `rimraf` (scripts portables Windows/Unix)
 
 ---
 

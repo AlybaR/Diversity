@@ -4,13 +4,14 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { KeyRound, Mail, RefreshCw, X } from 'lucide-react-native';
 import { AppHeader } from '../../components/AppHeader';
 import { BottomNav } from '../../components/BottomNav';
+import { LoadingState } from '../../components/LoadingState';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { SecondaryButton } from '../../components/SecondaryButton';
 import { DossierCard } from '../../components/DossierCard';
 import { RepresentativeCard } from '../../components/RepresentativeCard';
 import { AppointmentCard } from '../../components/AppointmentCard';
 import { Card } from '../../components/Card';
-import { DOSSIERS, ECOLES, PERSONNES, RENDEZ_VOUS } from '../../data/mockData';
+import { useDossiers, useEcole, usePersonnes, useRendezVous } from '../../hooks';
 
 function generateSchoolKey(ecoleId: string) {
   const prefix = ecoleId
@@ -24,16 +25,46 @@ function generateSchoolKey(ecoleId: string) {
 
 export default function SchoolDetailScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
-  const ecole = ECOLES.find((e) => e.id === id) ?? ECOLES[0];
-  const dossiers = DOSSIERS.filter((d) => d.ecoleId === ecole.id);
-  const representants = PERSONNES.filter(
-    (p) =>
-      p.ecoleId === ecole.id && (p.role === 'parent_admin' || p.role === 'parent_contributeur'),
-  );
-  const rdvs = RENDEZ_VOUS.slice(0, 1);
-  const [currentKey, setCurrentKey] = useState(ecole.cle);
+  // Données via hooks → cache partagé + réactivité aux mutations (ajout d'agent,
+  // de représentant…). Permet d'éviter les listes périmées entre 2 navigations.
+  const { data: ecole, isLoading: ecoleLoading } = useEcole(id);
+  const { data: dossiers = [] } = useDossiers({ ecoleId: ecole?.id });
+  const { data: representants = [] } = usePersonnes({
+    ecoleId: ecole?.id,
+    representantsOnly: true,
+  });
+  const { data: rdvs = [] } = useRendezVous();
+
+  // Hooks State avant les early returns : règle des hooks React.
+  const [currentKey, setCurrentKey] = useState<string | null>(null);
   const [keyModalOpen, setKeyModalOpen] = useState(false);
   const [generatedKey, setGeneratedKey] = useState('');
+
+  if (ecoleLoading && !ecole) {
+    return (
+      <View className="flex-1 bg-slate-50">
+        <AppHeader title="Détail école" />
+        <LoadingState label="Chargement de l’école…" />
+      </View>
+    );
+  }
+
+  if (!ecole) {
+    return (
+      <View className="flex-1 bg-slate-50">
+        <AppHeader title="École introuvable" />
+        <View className="flex-1 items-center justify-center px-6">
+          <Text className="text-slate-500 text-sm text-center">
+            Cette école n’est pas rattachée à votre collectivité ou son identifiant est invalide.
+          </Text>
+        </View>
+        <BottomNav variant="mairie" />
+      </View>
+    );
+  }
+
+  const displayedKey = currentKey ?? ecole.cle;
+  const upcomingRdvs = rdvs.slice(0, 1);
 
   const openKeyModal = () => {
     setGeneratedKey(generateSchoolKey(ecole.id));
@@ -63,7 +94,7 @@ export default function SchoolDetailScreen() {
             <Text className="text-slate-700 font-bold text-sm">Clé école</Text>
             <Text className="text-slate-400 text-xs">À transmettre aux nouveaux représentants</Text>
           </View>
-          <Text className="text-primary-600 font-mono font-bold">{currentKey}</Text>
+          <Text className="text-primary-600 font-mono font-bold">{displayedKey}</Text>
         </Card>
 
         <Text className="text-slate-700 font-bold text-sm mb-2 mt-2">
@@ -85,7 +116,7 @@ export default function SchoolDetailScreen() {
         ))}
 
         <Text className="text-slate-700 font-bold text-sm mb-2 mt-2">Rendez-vous à venir</Text>
-        {rdvs.map((r) => (
+        {upcomingRdvs.map((r) => (
           <AppointmentCard key={r.id} rdv={r} />
         ))}
 
@@ -123,7 +154,7 @@ export default function SchoolDetailScreen() {
 
             <View className="rounded-xl bg-slate-50 border border-slate-100 p-4 mb-3">
               <Text className="text-slate-400 text-xs font-semibold mb-1">Clé actuelle</Text>
-              <Text className="text-slate-700 font-mono font-bold">{currentKey}</Text>
+              <Text className="text-slate-700 font-mono font-bold">{displayedKey}</Text>
             </View>
 
             <View className="rounded-xl bg-primary-50 border border-primary-100 p-4">

@@ -12,30 +12,35 @@ import { AppHeader } from '../../components/AppHeader';
 import { BottomNav } from '../../components/BottomNav';
 import { Card } from '../../components/Card';
 import { PrimaryButton } from '../../components/PrimaryButton';
-import { DOSSIERS, MESSAGES, RENDEZ_VOUS } from '../../data/mockData';
+import { useDossiers, useMessages, useRendezVous } from '../../hooks';
 
 type ExportFormat = 'pdf' | 'txt';
 
 export default function ExportScreen() {
   const [format, setFormat] = useState<ExportFormat>('pdf');
+  // Données via hooks → l'aperçu reflète les ajouts/résolutions faits en démo
+  // sans avoir besoin de recharger l'écran manuellement.
+  const { data: dossiers = [] } = useDossiers();
+  const { data: messages = [] } = useMessages();
+  const { data: rdvs = [] } = useRendezVous();
   const stats = useMemo(
     () => [
       {
         label: 'Dossiers ouverts',
-        value: DOSSIERS.filter((dossier) => dossier.statut !== 'resolu').length,
+        value: dossiers.filter((dossier) => dossier.statut !== 'resolu').length,
         icon: FolderOpen,
         color: '#2563eb',
       },
       {
         label: 'Dossiers résolus',
-        value: DOSSIERS.filter((dossier) => dossier.statut === 'resolu').length,
+        value: dossiers.filter((dossier) => dossier.statut === 'resolu').length,
         icon: CheckCircle2,
         color: '#059669',
       },
-      { label: 'Rendez-vous', value: RENDEZ_VOUS.length, icon: CalendarDays, color: '#d97706' },
-      { label: 'Messages mairie', value: MESSAGES.length, icon: MessageSquare, color: '#6366f1' },
+      { label: 'Rendez-vous', value: rdvs.length, icon: CalendarDays, color: '#d97706' },
+      { label: 'Messages mairie', value: messages.length, icon: MessageSquare, color: '#6366f1' },
     ],
-    [],
+    [dossiers, messages, rdvs],
   );
 
   const categories = [

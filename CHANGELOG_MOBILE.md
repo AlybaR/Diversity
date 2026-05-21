@@ -1513,6 +1513,80 @@ roles (parent profile, mairie dashboard, direction home).
 
 ---
 
+## 2026-05-21 — Étape 15.C : Audit dette + migration 3 écrans + sync documentation
+
+### Contexte
+L'utilisateur n'avait pas accès aux opérations nécessitant son intervention (push GitHub bloqué SSL dans la sandbox, activation Supabase nécessitant accès au projet). J'ai continué sur les actions auto-suffisantes : audit du code, migration d'écrans à pattern legacy, mise à jour de la documentation.
+
+### Audit code (résultat)
+Grep `as any|as never|@ts-ignore|console.log|TODO|FIXME` sur tout le projet :
+- ✅ `lib/sentry.ts` : `console.log` + `TODO Phase 3+` documentés (placeholders Sentry SDK) → à garder
+- ✅ `app/aide/contact.tsx` : `TODO Phase 4` pour emails DPO/support → à garder
+- ✅ `app/auth/callback.tsx` : `console.log` debug du flow Supabase auth → à garder en l'état
+- ✅ Aucun `as any`, `as never`, `@ts-ignore` orphelin
+
+Grep `from '.*data/mockData'` dans `app/` : 28 occurrences, dont :
+- **Légitimes** (16) : enums (`CATEGORIES`, `URGENCES`, `STATUTS_DOSSIER`, `CONTACTS_MAIRIE`, `ANCIENS_ADMINS`), constants (`MAIRIE`, `UTILISATEUR_COURANT`), helpers (`resetMockData`, `setCurrentUser`, `getCurrentUser`)
+- **À migrer** (12) : `DOSSIERS`/`PERSONNES`/`MESSAGES`/`RENDEZ_VOUS` directs qui bypassent le cache React Query
+
+### Migrations (3 écrans)
+
+#### `app/mairie/school-detail.tsx`
+- 4 imports directs (`DOSSIERS`, `ECOLES`, `PERSONNES`, `RENDEZ_VOUS`) → hooks (`useEcole(id)`, `useDossiers({ ecoleId })`, `usePersonnes({ ecoleId, representantsOnly: true })`, `useRendezVous()`)
+- Ajout d'un loading state + écran « École introuvable » si l'id est invalide
+- Bénéfice : si on ajoute un représentant via `/mairie/equipe` ou `/direction/directory` puis qu'on visite le détail école, **la liste se met à jour automatiquement** (réactivité React Query)
+
+#### `app/parent/export.tsx`
+- 3 imports directs (`DOSSIERS`, `MESSAGES`, `RENDEZ_VOUS`) → hooks
+- Le `useMemo` des stats dépend maintenant des hooks → recalcul automatique si les données changent en démo
+- Bénéfice : la synthèse école reflète les ajouts/résolutions faits en démo sans recharger
+
+#### `app/parent/validation.tsx`
+- 1 import direct (`DOSSIERS[0]`) → `useDossiers({ visibleByRole: 'parent_admin' })[0]`
+- Ajout d'un loading state si la liste n'est pas encore chargée
+
+### Documentation synchronisée
+
+#### `TODO.md`
+- Nouveau bloc "État global" en tête : tableau récapitulatif Phase 0 → Phase 6 avec statuts ✅/⏳
+- Section 3 "Backend" reformulée : passe de "à prévoir" à "✅ Fondations Supabase / ⏳ Activation" avec procédure d'activation
+- Section 4 "Authentification" reformulée : passe de "à prévoir" à "✅ Magic link implémenté"
+- Section 6 "RGPD" : statuts détaillés Phase 4 (pages légales ✅, DPO ⏳)
+- Section 7 "Notifications push" : statut "✅ Phase 3 collecte tokens / ⏳ Phase 5 envoi serveur"
+- Section 13 "Améliorations techniques" : statuts ESLint/Prettier/typed routes/CI ✅, Sentry stub ✅
+- Nouvelle section 15 "Migration mockData → hooks" : tableau de bord des migrations par hub
+- Nouvelle section 16 "Démo 3 jours" : récap des fonctionnalités démo livrées
+
+#### `README.md`
+- Section Stack restructurée en sous-sections : Cœur / Données & état / UI & animation / Web target / Outillage qualité
+- Ajout explicite de `@tanstack/react-query`, `@supabase/supabase-js`, `expo-notifications`, async-storage, netinfo
+- Mention du feature flag `EXPO_PUBLIC_USE_SUPABASE`
+
+### Vérifications
+- ✅ `npm run typecheck` : exit 0
+- ✅ `npm run lint` : 0 erreur, 0 warning
+- ✅ Imports `mockData` non légitimes réduits de 12 à 9 (5 écrans à migrer plus tard : mode-elu, stats, passage-annee, direction/* secondaires)
+
+### Commit local (à pousser)
+```
+docs+refactor(demo): audit + migration 3 ecrans + sync TODO/README
+
+- school-detail mairie, export parent, validation parent migrent vers
+  les hooks React Query → cache + reactivite aux mutations
+- TODO.md : nouveau bloc "Etat global" Phase 0-6, statuts Supabase/auth/
+  RGPD/push reformules en "Fait" plutot que "A prevoir", nouvelles
+  sections 15 (migration mockData) et 16 (demo 3 jours)
+- README.md : section Stack restructuree par categorie, mention React
+  Query + Supabase + feature flag USE_SUPABASE
+
+TypeScript clean, lint clean. 9 imports mockData legitimes restants
+(enums, constantes, helpers demo). 5 ecrans secondaires a migrer plus
+tard (mode-elu, stats, passage-annee, direction/dossier-detail,
+direction/new-request).
+```
+
+---
+
 ## 2026-05-21 — Étape 15.A : Commit annuaire éditable côté direction + équipe mairie
 
 ### Fichiers modifiés

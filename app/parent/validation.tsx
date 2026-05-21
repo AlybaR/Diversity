@@ -8,8 +8,9 @@ import { Card } from '../../components/Card';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { SecondaryButton } from '../../components/SecondaryButton';
 import { TextInputField } from '../../components/TextInputField';
-import { DOSSIERS } from '../../data/mockData';
+import { useDossiers } from '../../hooks';
 import { UrgenceBadge } from '../../components/StatusBadge';
+import { LoadingState } from '../../components/LoadingState';
 
 const initialVotes = [
   { initials: 'NB', name: 'Nadia Benali', approved: true },
@@ -18,7 +19,10 @@ const initialVotes = [
 ];
 
 export default function ValidationScreen() {
-  const dossier = DOSSIERS[0];
+  // Premier dossier visible côté parent administrateur (placeholder de démo —
+  // en production ce serait l'id passé en query string).
+  const { data: dossiers = [] } = useDossiers({ visibleByRole: 'parent_admin' });
+  const dossier = dossiers[0];
   const [votes, setVotes] = useState(initialVotes);
   const [commentaire, setCommentaire] = useState('');
   const approvedCount = votes.filter((vote) => vote.approved).length;
@@ -29,6 +33,16 @@ export default function ValidationScreen() {
     );
     Alert.alert('Approbation enregistrée', 'La validation collective est à jour.');
   };
+
+  if (!dossier) {
+    return (
+      <View className="flex-1 bg-slate-50">
+        <AppHeader title="Validation collective" subtitle="Avant envoi à la mairie" />
+        <LoadingState label="Chargement du dossier…" />
+        <BottomNav variant="parent" />
+      </View>
+    );
+  }
 
   return (
     <View className="flex-1 bg-slate-50">

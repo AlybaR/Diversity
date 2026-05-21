@@ -1,8 +1,21 @@
 # TODO — mobile-app
 
-Roadmap après recentrage MVP.
+Roadmap après recentrage MVP (mise à jour 2026-05-21, post Phase 4).
 
 > La maquette visible est centrée sur dossiers, messages, rendez-vous, écoles et annuaire parents/mairie. Les anciennes routes restent en réserve dans [`MAQUETTE_COMPLETE.md`](MAQUETTE_COMPLETE.md), sans lien depuis les hubs principaux.
+
+## État global
+
+| Phase | Statut | Détail |
+| --- | --- | --- |
+| **Phase 0** — CI GitHub Actions + templates PR | ✅ Fait | `.github/workflows/ci.yml`, templates Issues/PR, `CONTRIBUTING.md` |
+| **Phase 1** — Fondations Supabase | ✅ Fait | Client + 4 migrations + RLS + 7 mappers, feature flag `USE_SUPABASE` |
+| **Phase 2** — Auth magic link | ✅ Fait | `app/sign-in/`, `app/auth/callback.tsx`, `useSession`, `AuthGuard` |
+| **Phase 3** — Robustesse prod | ✅ Fait | `EmptyState`, `ErrorBanner`, `LoadingState`, `OfflineBanner`, Sentry stub |
+| **Phase 4** — Légal & RGPD | ✅ Fait | `app/legal/{cgu,privacy,mentions}`, `app/aide/{comment-ca-marche,faq,contact}` |
+| **Démo 3 jours** — visite guidée + reset + annuaire éditable | ✅ Fait | `useGuidedTour` (9 étapes), `DemoPersonneSelector` avec reset universel, `useCreatePersonne` mutation |
+| **Phase 5** — Push notifications serveur + exports PDF | ⏳ À faire | Côté client : `lib/notifications.ts` collecte les tokens. Côté serveur : Edge Function Supabase + génération PDF |
+| **Phase 6** — Publication App Store / Play | ⏳ À faire | EAS Build, comptes développeurs, captures d'écran |
 
 ---
 
@@ -31,36 +44,48 @@ Ces fichiers existent encore pour mémoire, mais ne doivent pas revenir dans la 
 
 ---
 
-## 3. Backend à prévoir
+## 3. Backend — Supabase (✅ Fondations, ⏳ Activation)
 
-### Options
+### Décision actée — Supabase
 
-- **Supabase** : Postgres + auth + storage + realtime (recommandé pour ce type de cas — RGPD, hébergement EU possible)
-- **Firebase** : alternative globale (mais data hors UE par défaut)
-- **Solution custom** : Node.js + Postgres + auth maison (plus de contrôle, plus de travail)
+Choix retenu : **Supabase** pour Postgres + auth + storage + realtime + Edge Functions, hébergement EU disponible (`eu-west-3` pour Paris).
 
-### Endpoints minimums
+### Statut
 
-- `GET /schools/:id` — détail école
-- `GET /dossiers?ecoleId=...&statut=...` — listing avec filtres
-- `POST /dossiers` — créer dossier
-- `PATCH /dossiers/:id` — mettre à jour statut
-- `POST /dossiers/:id/comments` — ajouter commentaire
-- `GET /messages?ecoleId=...` — messages mairie pour une école
-- `POST /messages` — diffuser un message mairie
-- `GET /rendez-vous?ecoleId=...`
-- `POST /rendez-vous` + workflow validation
-- `GET /personnes?ecoleId=...` — annuaire
-- `POST /invitations` — inviter représentant (génère un lien + email)
+- ✅ Client initialisé (`lib/supabase.ts`) avec persistance AsyncStorage (natif) + localStorage (web)
+- ✅ 4 migrations SQL versionnées (`supabase/migrations/0001` à `0004`)
+- ✅ Row Level Security configurée par rôle
+- ✅ 7 mappers Supabase dans `services/supabase/` (dossiers, messages, personnes, rendez-vous, écoles, auth, _mappers)
+- ✅ Seed pour parité avec `data/mockData.ts`
+- ✅ Feature flag `EXPO_PUBLIC_USE_SUPABASE` (actuellement `false` = mode mock)
+- ⏳ **Activer le projet Supabase** : appliquer les migrations, charger le seed, basculer `USE_SUPABASE=true`, tester chaque parcours
+- ⏳ **Mutations write-side** : pour l'instant les services Supabase couvrent surtout les SELECT. Les INSERT/UPDATE/DELETE doivent être branchés via `useMutation` (cf. `useCreateRendezVous`, `useCreatePersonne` qui existent déjà en mode mock).
+
+### Procédure d'activation (quand prêt)
+
+```bash
+# 1. Dans Supabase Studio : importer migrations/0001..0004 + seed
+# 2. Vérifier RLS et test user via 0003_auth_link_rpc
+# 3. Dans .env.local :
+EXPO_PUBLIC_USE_SUPABASE=true
+# 4. npm run web → tester le parcours auth + chaque hub
+```
 
 ---
 
-## 4. Authentification
+## 4. Authentification — Magic link (✅ Fait)
 
-- **Choix** : auth par email + mot de passe + clé école au premier accès
-- **Stockage local** : `expo-secure-store` (token JWT chiffré)
-- **OAuth optionnel** : France Connect (selon politique de la collectivité)
-- Gestion du rôle dans le token JWT côté backend
+Statut : **implémenté en mode Supabase**.
+
+- ✅ Magic link via `supabase.auth.signInWithOtp()` (cf. `app/sign-in/`)
+- ✅ Callback handler `app/auth/callback.tsx` avec linking `auth.users ↔ personnes` via RPC `link_current_user_to_personne`
+- ✅ Session persistante via `lib/supabase.ts` (AsyncStorage natif + localStorage web)
+- ✅ `useSession()` expose `personne` + `signOut()`
+- ✅ `AuthGuard` composant pour protéger les routes (à utiliser quand `USE_SUPABASE=true`)
+- ✅ Page debug `app/auth/debug.tsx` pour inspecter la session
+- ✅ Page no-access `app/auth/no-access.tsx` si l'utilisateur n'est lié à aucune personne
+- ⏳ **France Connect** : OAuth optionnel selon politique collectivité (Phase 6+)
+- ⏳ **Rôles dans le JWT** : la RLS actuelle lit le rôle depuis `personnes` ; à confirmer pour la production
 
 ---
 
@@ -78,28 +103,35 @@ Ces fichiers existent encore pour mémoire, mais ne doivent pas revenir dans la 
 
 ---
 
-## 6. RGPD
+## 6. RGPD (✅ Phase 4 — partiellement fait)
 
-- Bandeau cookies / consentement
-- Page « Mes données » avec export et suppression de compte
-- DPA / DPO de la collectivité référencé
-- Pas de tracking analytics tiers sans consentement
-- Hébergement des données en France (Scaleway, OVH, ou région EU de cloud provider)
-- Anonymisation des logs au-delà de 30 jours
-- Politique de confidentialité accessible depuis l'app (lien web ou page in-app)
+- ✅ Page Politique de confidentialité : `app/legal/privacy.tsx`
+- ✅ Page CGU : `app/legal/cgu.tsx`
+- ✅ Mentions légales : `app/legal/mentions.tsx`
+- ✅ Centre d'aide / FAQ / contact : `app/aide/{comment-ca-marche,faq,contact}.tsx`
+- ✅ Export de ses données : Row dans `/parent/profile` qui appelle `addBreadcrumb` + `captureMessage` Sentry (placeholder visuel, le ZIP sera généré en Phase 5)
+- ✅ Suppression de compte : modal de confirmation double (texte exact "supprimer" à taper) dans `/parent/profile`
+- ⏳ **DPO référencé** : email dans `app/aide/contact.tsx` ligne 18 (`dpo@passerelle.fr` placeholder, à remplacer Phase 4 finale)
+- ⏳ **Pas de tracking analytics** : à valider quand on choisira un outil de mesure (objectif : pas de Google Analytics, plutôt Plausible/Matomo self-hosted)
+- ⏳ **Hébergement EU** : à confirmer côté Supabase (région `eu-west-3` Paris recommandée)
+- ⏳ **Anonymisation logs** : à implémenter côté Edge Functions (purge auto au-delà de 30 jours)
+- ⏳ **Pipeline d'export ZIP** : Edge Function Supabase Phase 5
 
 ---
 
-## 7. Notifications push
+## 7. Notifications push (✅ Phase 3 — collecte tokens, ⏳ Phase 5 — envoi serveur)
 
-- **expo-notifications** pour iOS + Android
-- Événements à notifier :
+- ✅ `lib/notifications.ts` : `registerForPushNotifications(personneId)` demande permission + récupère token Expo + persiste dans `personnes.push_token` (migration `0004`)
+- ✅ Idempotent : peut être appelé à chaque login
+- ✅ `hooks/usePushRegistration.ts` côté client
+- ⏳ **Envoi côté serveur** : Edge Function Supabase qui consomme le bus d'événements et envoie les notifications via Expo Push API
+- ⏳ Événements à brancher :
   - Nouveau message mairie
   - Mise à jour statut d'un dossier
   - Proposition de rendez-vous
   - Confirmation d'un rendez-vous
   - Rappel J-1 avant un rendez-vous
-- Centre de notifications in-app + page paramètres
+- ⏳ Centre de notifications in-app + page paramètres (placeholders dans le profil)
 
 ---
 
@@ -164,11 +196,41 @@ Ces fichiers existent encore pour mémoire, mais ne doivent pas revenir dans la 
 
 ## 13. Améliorations techniques
 
-- Ajouter ESLint + Prettier (config Expo standard)
-- Husky + lint-staged pour les hooks git
-- CI : EAS Build sur push tags
-- Sentry pour l'error monitoring (avec respect RGPD)
-- Mise à jour OTA via Expo Updates (déploiements rapides hors store)
+- ✅ **ESLint + Prettier** : config Expo standard, scripts `npm run lint`, `lint:fix`, `format`, `format:check`, `typecheck`, `bundle:check`
+- ✅ **Typed routes Expo Router** : `experiments.typedRoutes: true` dans `app.json` (régénération auto à chaque `expo start`)
+- ✅ **Sentry stub** : `lib/sentry.ts` avec `addBreadcrumb`, `captureMessage`, `captureException`, `setUser`, `clearUser` — branché en mode console.log, à activer Phase 3+
+- ✅ **CI GitHub Actions** : `.github/workflows/ci.yml` (lint + typecheck + bundle)
+- ✅ **Cross-platform scripts** : `cross-env` + `rimraf` pour Windows/Unix
+- ⏳ **Husky + lint-staged** : hooks pre-commit pour bloquer les fichiers mal formés
+- ⏳ **EAS Build** sur push tags : workflow CD pour générer les binaires App Store / Play
+- ⏳ **Sentry production** : remplacer le stub par `@sentry/react-native` quand le projet Sentry sera créé (Phase 3+)
+- ⏳ **Expo Updates** : mises à jour OTA hors store (Phase 6+)
+- ⏳ **Tests Jest + RNTL** : voir section 10
+
+---
+
+## 15. Migration mockData → hooks (✅ Quasi terminée, ⏳ 5 écrans restants)
+
+Architecture cible : tous les composants consomment les données via `hooks/use<Entity>.ts` (React Query) qui appellent `services/<entity>.ts`. Bénéfice : cache partagé + réactivité aux mutations + migration vers Supabase = changer uniquement les services.
+
+| Statut | Écrans migrés (hooks) | Restant (import direct mockData) |
+| --- | --- | --- |
+| ✅ | parent/home, parent/dossiers, parent/dossier-detail, parent/directory, parent/messages, parent/appointments, parent/export, parent/validation | parent/passage-annee, parent/new-request (UTILISATEUR_COURANT, CATEGORIES — légitime) |
+| ✅ | mairie/dashboard, mairie/schools, mairie/school-detail, mairie/equipe, mairie/reply (partiel) | mairie/mode-elu, mairie/stats, mairie/dossier-detail (PERSONNES seulement) |
+| ✅ | direction/home, direction/directory | direction/dossiers, direction/dossier-detail, direction/appointments, direction/new-request (PERSONNES) |
+
+**Imports légitimes restants** : `CATEGORIES`, `URGENCES`, `STATUTS_DOSSIER`, `CONTACTS_MAIRIE`, `ANCIENS_ADMINS`, `MAIRIE`, `UTILISATEUR_COURANT`, `resetMockData`, `setCurrentUser`, `getCurrentUser` — ce sont des enums, constants ou helpers démo qui n'ont pas vocation à passer par hooks.
+
+---
+
+## 16. Démo 3 jours (✅ Fait)
+
+- ✅ Visite guidée par bulles 9 étapes (`useGuidedTour`) couvrant les 3 hubs + les 2 annuaires éditables
+- ✅ QR code de partage (`DemoQrCode`)
+- ✅ Sélecteur de personnage démo (`DemoPersonneSelector`) avec bouton reset intégré
+- ✅ Reset démo universel via `resetMockData()` + `queryClient.invalidateQueries()` accessible depuis parent/profile, mairie/dashboard, direction/home
+- ✅ Annuaires éditables : `useCreatePersonne` mutation, ajout d'agents/élus/enseignants en temps réel
+- ✅ Pas de cadre iPhone sur desktop (`PhoneFrame` désactivé sous 600px)
 
 ---
 
