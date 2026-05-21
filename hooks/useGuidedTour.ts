@@ -1,24 +1,29 @@
 /**
- * useGuidedTour — état global de la visite guidée de démo.
+ * useGuidedTour — visite guidée avec navigation automatique.
  *
- * Architecture : pattern subscribe externe + useSyncExternalStore (cf. useDemoUser).
- * Permet à n'importe quel composant de réagir aux changements sans Context.
+ * Pattern subscribe externe + useSyncExternalStore (cf. useDemoUser). Permet
+ * à n'importe quel composant de réagir aux changements sans Context.
+ *
+ * Comportement clé : chaque étape a un `navigateTo` et optionnel `switchToRole`.
+ * Quand l'utilisateur clique "Suivant" :
+ *   1. On switch l'utilisateur courant si l'étape suivante l'exige
+ *      (ex: passer de Nadia/parent à Claire/mairie)
+ *   2. On router.replace() vers le path cible (l'écran change)
+ *   3. On avance le state (la bulle change de contenu)
+ *
+ * Donc l'utilisateur n'a JAMAIS besoin de cliquer ailleurs que sur la bulle.
+ * Il regarde, il clique Suivant, il regarde, il clique Suivant. Visite passive.
  *
  * Persistance : AsyncStorage clé `@passerelle-tour-done` pour mémoriser que
- * l'utilisateur a fini ou skippé la visite (on ne lui repropose plus le CTA
- * jusqu'à reset).
- *
- * Le scénario (TOUR_STEPS) est statique : 6 étapes qui couvrent :
- *   1. Accueil + présentation
- *   2. Vue mairie (dashboard)
- *   3. Détail d'un dossier mairie + scope visibility
- *   4. Switch de rôle via Mode démo
- *   5. Vue parent (dossiers)
- *   6. Création d'un dossier + félicitations finales
+ * l'utilisateur a fini ou skippé la visite (on ne lui repropose plus le CTA).
  */
 
 import { useCallback, useEffect, useSyncExternalStore } from 'react';
+import { router, type Href } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { PERSONNES } from '../data/mockData';
+import type { Role } from '../types';
+import { useDemoUser } from './useDemoUser';
 
 const STORAGE_KEY = '@passerelle-tour-done';
 
@@ -30,72 +35,88 @@ export interface TourStep {
   description: string;
   /** Libellé du bouton de progression */
   nextLabel?: string;
-  /** Chemin de route attendu (si défini, la bulle peut suggérer "naviguez vers X") */
-  hintPath?: string;
+  /**
+   * Chemin où naviguer pour atteindre cette étape (router.replace). Si défini,
+   * appelé AVANT d'afficher l'étape (= au moment où on avance vers).
+   */
+  navigateTo?: string;
+  /**
+   * Si défini, change l'utilisateur courant pour le premier personnage du
+   * rôle indiqué AVANT de naviguer. Permet de simuler "comme si tu te
+   * connectais en mairie / parent / direction".
+   */
+  switchToRole?: Role;
 }
 
 export const TOUR_STEPS: TourStep[] = [
   {
     id: 'welcome',
-    title: '👋 Bienvenue dans la démo Passerelle',
+    title: '👋 Bienvenue dans Passerelle',
     description:
-      "Passerelle coordonne 3 acteurs : parents élus, mairie et direction d'école. Cette visite te montre les points clés en 60 secondes.",
+      "Passerelle coordonne 3 acteurs autour de l'école : parents élus, mairie, direction. Cette visite te montre les points clés en 60 secondes — clique simplement « Suivant ».",
     nextLabel: 'Commencer →',
   },
   {
-    id: 'choose-mairie',
-    title: 'Étape 1 — Vue mairie',
+    id: 'parent-home',
+    title: 'Côté parent élu',
     description:
-      'Tape sur « Je suis une mairie » pour découvrir ce que voit le service éducation municipal.',
+      "Voici l'accueil d'un parent élu (Nadia). On y voit l'activité de son école : dossiers ouverts, urgents, derniers messages mairie, prochain RDV.",
     nextLabel: 'Suivant',
-    hintPath: '/mairie/dashboard',
+    navigateTo: '/parent/home',
+    switchToRole: 'parent_admin',
+  },
+  {
+    id: 'parent-dossiers',
+    title: 'La liste des dossiers',
+    description:
+      'Tous les dossiers visibles par le parent. Les filtres en haut permettent de trier (urgents, en attente mairie, résolus). On va maintenant changer de rôle.',
+    nextLabel: 'Passer côté mairie',
+    navigateTo: '/parent/dossiers',
   },
   {
     id: 'mairie-dashboard',
-    title: 'Étape 2 — Le tableau de bord',
+    title: 'Côté mairie',
     description:
-      "La mairie voit l'activité agrégée de toutes les écoles. Tape sur un dossier dans la liste pour ouvrir son détail.",
-    nextLabel: "J'ai ouvert un dossier",
-    hintPath: '/mairie/dossier-detail',
+      "Maintenant tu es Claire, agent du service éducation. Tu vois l'activité agrégée de toutes les écoles, pas juste une.",
+    nextLabel: 'Voir les dossiers',
+    navigateTo: '/mairie/dashboard',
+    switchToRole: 'mairie_admin',
   },
   {
-    id: 'mairie-dossier',
-    title: 'Étape 3 — Canal de visibilité',
+    id: 'mairie-dossiers',
+    title: 'Vue mairie : tous les dossiers',
     description:
-      "Chaque dossier a un canal qui détermine qui peut le voir (parents↔mairie, direction↔mairie, tripartite, mairie interne). C'est l'isolation au cœur de Passerelle.",
-    nextLabel: 'Compris, suite',
-  },
-  {
-    id: 'switch-role',
-    title: 'Étape 4 — Changer de personnage',
-    description:
-      'Reviens au Welcome (ou via ton profil) et utilise « Mode démo : tester un autre rôle » pour passer côté parent et voir la même app sous un angle différent.',
+      "La mairie voit TOUS les dossiers, quels que soient leurs canaux. Les parents et la direction ne voient que ce qui les concerne. C'est l'isolation au cœur de Passerelle.",
     nextLabel: 'Suivant',
-    hintPath: '/parent/home',
+    navigateTo: '/mairie/dossiers',
   },
   {
-    id: 'parent-create',
-    title: 'Étape 5 — Créer un dossier',
+    id: 'direction-home',
+    title: 'Côté direction d’école',
     description:
-      "Côté parent, va dans « Mes dossiers » et crée une nouvelle demande. Tu verras qu'elle apparaît immédiatement, puis côté mairie après changement de rôle.",
-    nextLabel: 'Terminer la visite',
+      'Enfin, voici la vue de la directrice. Elle ne voit que les sujets institutionnels (canal direction↔mairie ou tripartite) — jamais les conversations privées parents↔mairie.',
+    nextLabel: 'Suivant',
+    navigateTo: '/direction/home',
+    switchToRole: 'direction',
   },
   {
     id: 'done',
     title: '🎉 Visite terminée',
     description:
-      'Tu as vu les éléments clés : les 3 rôles, les canaux de visibilité, la création + réponse. Explore librement maintenant.',
-    nextLabel: 'Fermer',
+      "Tu as vu les 3 rôles et le principe d'isolation. À toi maintenant : explore les écrans, crée un dossier, change de personnage via « Mode démo » sur l'accueil.",
+    nextLabel: "C'est parti",
+    navigateTo: '/',
+    switchToRole: 'parent_admin',
   },
 ];
 
 // =============================================================================
-// State global
+// State global (subscribe pattern)
 // =============================================================================
 interface TourState {
   active: boolean;
-  step: number; // index dans TOUR_STEPS
-  hasCompleted: boolean; // savoir si on ne propose plus le CTA
+  step: number;
+  hasCompleted: boolean;
 }
 
 let _state: TourState = {
@@ -122,7 +143,6 @@ function getSnapshot(): TourState {
   return _state;
 }
 
-// Cache de l'état "completed" pour éviter de relire AsyncStorage à chaque mount
 let _initialized = false;
 async function initializeFromStorage(): Promise<void> {
   if (_initialized) return;
@@ -159,36 +179,64 @@ async function clearCompleted(): Promise<void> {
 // =============================================================================
 export function useGuidedTour() {
   const state = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+  const { switchTo } = useDemoUser();
 
   useEffect(() => {
     initializeFromStorage();
   }, []);
 
+  /** Applique navigation + switchRole d'un step donné */
+  const applyStepActions = useCallback(
+    (step: TourStep) => {
+      if (step.switchToRole) {
+        const personne = PERSONNES.find((p) => p.role === step.switchToRole);
+        if (personne) {
+          // switchTo(id, { redirect: false }) : on ne laisse pas useDemoUser
+          // rediriger vers la home par défaut, c'est le step.navigateTo qui
+          // décide où atterrir.
+          switchTo(personne.id, { redirect: false });
+        }
+      }
+      if (step.navigateTo) {
+        router.replace(step.navigateTo as Href);
+      }
+    },
+    [switchTo],
+  );
+
   const start = useCallback(() => {
     _state = { active: true, step: 0, hasCompleted: false };
     notify();
+    // L'étape 0 (welcome) n'a pas de navigateTo : on reste où on est.
   }, []);
 
   const next = useCallback(() => {
     if (!_state.active) return;
     const nextIndex = _state.step + 1;
     if (nextIndex >= TOUR_STEPS.length) {
-      // Fin
+      // Fin de la visite
       _state = { active: false, step: 0, hasCompleted: true };
       persistCompleted();
       notify();
+      // On peut tout de même appliquer le dernier step (ex: retour à l'accueil)
+      const lastStep = TOUR_STEPS[TOUR_STEPS.length - 1];
+      applyStepActions(lastStep);
       return;
     }
+    const targetStep = TOUR_STEPS[nextIndex];
+    applyStepActions(targetStep);
     _state = { ..._state, step: nextIndex };
     notify();
-  }, []);
+  }, [applyStepActions]);
 
   const previous = useCallback(() => {
     if (!_state.active) return;
     const prevIndex = Math.max(0, _state.step - 1);
+    const targetStep = TOUR_STEPS[prevIndex];
+    applyStepActions(targetStep);
     _state = { ..._state, step: prevIndex };
     notify();
-  }, []);
+  }, [applyStepActions]);
 
   const skip = useCallback(() => {
     _state = { active: false, step: 0, hasCompleted: true };

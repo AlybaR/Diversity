@@ -8,6 +8,7 @@ import {
   Building2,
   CalendarDays,
   FolderOpen,
+  Home,
   Mail,
   School,
   Users,
@@ -90,9 +91,19 @@ export default function MairieDashboardScreen() {
         end={{ x: 1, y: 1 }}
         style={{ paddingTop: insets.top }}
       >
-        <View className="px-5 pt-2 pb-5">
-          <Text className="text-white font-bold text-lg">Tableau de bord</Text>
-          <Text className="text-teal-100 text-sm mt-1">{MAIRIE.nom}</Text>
+        <View className="px-5 pt-2 pb-5 flex-row items-center justify-between gap-3">
+          <View className="flex-1">
+            <Text className="text-white font-bold text-lg">Tableau de bord</Text>
+            <Text className="text-teal-100 text-sm mt-1">{MAIRIE.nom}</Text>
+          </View>
+          <Pressable
+            onPress={() => router.replace('/')}
+            hitSlop={6}
+            className="w-9 h-9 rounded-full items-center justify-center border border-white/20"
+            style={{ backgroundColor: 'rgba(255,255,255,0.15)' }}
+          >
+            <Home color="white" size={16} />
+          </Pressable>
         </View>
       </LinearGradient>
 

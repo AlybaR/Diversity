@@ -6,6 +6,7 @@ import {
   CalendarDays,
   ChevronRight,
   FolderOpen,
+  Home,
   MessageSquare,
   Plus,
   ShieldCheck,
@@ -63,7 +64,7 @@ export default function DirectionHomeScreen() {
         style={{ paddingTop: insets.top }}
       >
         <View className="px-5 pt-1 pb-5">
-          <View className="flex-row items-center justify-between mb-1">
+          <View className="flex-row items-center justify-between mb-1 gap-2">
             <View className="flex-1">
               <Text className="text-white font-bold text-lg leading-tight">
                 {ECOLE_DIRECTION.nom}
@@ -72,6 +73,14 @@ export default function DirectionHomeScreen() {
                 Année scolaire {ECOLE_DIRECTION.anneeScolaire}
               </Text>
             </View>
+            <Pressable
+              onPress={() => router.replace('/')}
+              hitSlop={6}
+              className="w-9 h-9 rounded-full items-center justify-center border border-white/20"
+              style={{ backgroundColor: 'rgba(255,255,255,0.15)' }}
+            >
+              <Home color="white" size={16} />
+            </Pressable>
             <View
               className="w-9 h-9 rounded-full items-center justify-center border border-white/20"
               style={{ backgroundColor: 'rgba(255,255,255,0.15)' }}

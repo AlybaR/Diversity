@@ -9,6 +9,7 @@ import {
   CalendarPlus,
   ChevronRight,
   FolderOpen,
+  Home,
   MessageSquare,
   Plus,
 } from 'lucide-react-native';
@@ -117,13 +118,21 @@ export default function ParentHomeScreen() {
         style={{ paddingTop: insets.top }}
       >
         <View className="px-5 pt-1 pb-5">
-          <View className="flex-row items-center justify-between mb-1">
+          <View className="flex-row items-center justify-between mb-1 gap-2">
             <View className="flex-1">
               <Text className="text-white font-bold text-lg leading-tight">{ecole.nom}</Text>
               <Text className="text-primary-200 text-xs mt-0.5">
                 Année scolaire {ecole.anneeScolaire}
               </Text>
             </View>
+            <Pressable
+              onPress={() => router.replace('/')}
+              hitSlop={6}
+              className="w-9 h-9 rounded-full items-center justify-center border border-white/20"
+              style={{ backgroundColor: 'rgba(255,255,255,0.15)' }}
+            >
+              <Home color="white" size={16} />
+            </Pressable>
             <Pressable
               onPress={() => router.push('/parent/profile' as Href)}
               className="w-9 h-9 rounded-full items-center justify-center border border-white/20"
