@@ -12,7 +12,8 @@ import { PrimaryButton } from '../../components/PrimaryButton';
 import { SecondaryButton } from '../../components/SecondaryButton';
 import { TextInputField } from '../../components/TextInputField';
 import { COLORS } from '../../constants/theme';
-import { useMessages } from '../../hooks';
+import { useCreateMessage, useMessages } from '../../hooks';
+import { UTILISATEUR_COURANT } from '../../data/mockData';
 
 export default function MessagesScreen() {
   const {
@@ -26,7 +27,9 @@ export default function MessagesScreen() {
   const [contenu, setContenu] = useState('');
   const nonLus = messages.filter((m) => !m.lu).length;
 
-  const handleSend = () => {
+  const createMessage = useCreateMessage();
+
+  const handleSend = async () => {
     if (titre.trim().length < 4 || contenu.trim().length < 10) {
       Alert.alert(
         'Message incomplet',
@@ -34,13 +37,20 @@ export default function MessagesScreen() {
       );
       return;
     }
-    setComposerOpen(false);
-    setTitre('');
-    setContenu('');
-    Alert.alert(
-      'Message préparé',
-      'Dans la version connectée, ce message sera transmis au service éducation.',
-    );
+    try {
+      await createMessage.mutateAsync({
+        titre,
+        contenu,
+        expediteur: `${UTILISATEUR_COURANT.prenom} ${UTILISATEUR_COURANT.nom}`,
+        visibilityScope: 'parents_mairie',
+      });
+      setComposerOpen(false);
+      setTitre('');
+      setContenu('');
+      Alert.alert('Message envoyé', 'La mairie a bien reçu votre message.');
+    } catch (err) {
+      Alert.alert('Erreur', err instanceof Error ? err.message : 'Échec de l’envoi.');
+    }
   };
 
   return (

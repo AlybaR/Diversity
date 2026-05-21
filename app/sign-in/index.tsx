@@ -8,6 +8,7 @@ import { GRADIENTS } from '../../constants/theme';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { TextInputField } from '../../components/TextInputField';
 import { supabase } from '../../lib/supabase';
+import { USE_SUPABASE } from '../../services/_config';
 
 type RoleHint = 'parent' | 'direction' | 'mairie';
 
@@ -43,6 +44,20 @@ export default function SignInScreen() {
     setSubmitted(true);
     if (!isValidEmail) return;
     setSubmitting(true);
+
+    // En mode démo (USE_SUPABASE=false) on ne fait AUCUN appel réseau : on
+    // simule un envoi de magic link et on redirige vers /sign-in/sent qui
+    // proposera le bouton « Continuer la démo » (faux clic du magic link).
+    if (!USE_SUPABASE) {
+      setTimeout(() => {
+        setSubmitting(false);
+        router.push({
+          pathname: '/sign-in/sent',
+          params: { email, role: roleHint, ecole, demo: '1' },
+        } as Href);
+      }, 350);
+      return;
+    }
 
     // emailRedirectTo : où Supabase renvoie l'utilisateur après clic sur le magic link.
     // En web on prend window.location.origin ; sur natif, Supabase ne gère pas l'URL

@@ -33,9 +33,11 @@ import {
   Scale,
   ShieldCheck,
   Trash2,
+  Users,
   X,
 } from 'lucide-react-native';
 import { BottomNav } from '../../components/BottomNav';
+import { DemoPersonneSelector } from '../../components/DemoPersonneSelector';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { SecondaryButton } from '../../components/SecondaryButton';
 import { TextInputField } from '../../components/TextInputField';
@@ -101,6 +103,7 @@ export default function ParentProfileScreen() {
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [confirmText, setConfirmText] = useState('');
+  const [demoOpen, setDemoOpen] = useState(false);
 
   const handleExport = () => {
     addBreadcrumb({ category: 'rgpd', message: 'export-requested', data: { personne_id: me.id } });
@@ -235,6 +238,20 @@ export default function ParentProfileScreen() {
           destructive
         />
 
+        {/* Mode démo : sélecteur de personnage (visible uniquement en mode mock) */}
+        {!USE_SUPABASE && (
+          <>
+            <SectionTitle>Mode démo</SectionTitle>
+            <Row
+              icon={<Users color={COLORS.accent[400]} size={18} />}
+              iconBg="bg-accent-50"
+              title="Changer de personnage"
+              subtitle="Tester l’app sous un autre rôle (parent, mairie, direction)"
+              onPress={() => setDemoOpen(true)}
+            />
+          </>
+        )}
+
         {/* Aide & Légal */}
         <SectionTitle>Aide & Légal</SectionTitle>
         <Row
@@ -345,6 +362,9 @@ export default function ParentProfileScreen() {
           <LogOut color={COLORS.slate[600]} size={20} />
         </Pressable>
       </View>
+
+      {/* Sheet sélecteur de personnage en mode démo */}
+      <DemoPersonneSelector visible={demoOpen} onClose={() => setDemoOpen(false)} />
     </View>
   );
 }

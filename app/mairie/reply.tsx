@@ -12,8 +12,8 @@ import { SelectField, type SelectOption } from '../../components/SelectField';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { Badge } from '../../components/Badge';
 import { StatutBadge, UrgenceBadge } from '../../components/StatusBadge';
-import { STATUTS_DOSSIER } from '../../data/mockData';
-import { useDossier, useDossiers } from '../../hooks';
+import { PERSONNES, STATUTS_DOSSIER } from '../../data/mockData';
+import { useCreateMessage, useDossier, useDossiers, useUpdateDossierStatut } from '../../hooks';
 import type { StatutDossier } from '../../types';
 
 type Service =
@@ -72,6 +72,8 @@ export default function MairieReplyScreen() {
   const [actionPrevue, setActionPrevue] = useState('');
   const [proposerRdv, setProposerRdv] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const updateStatut = useUpdateDossierStatut();
+  const createMessage = useCreateMessage();
 
   const isValid =
     reponse.trim().length >= 10 && nouveauStatut !== null && service !== null && delai !== null;
@@ -84,17 +86,37 @@ export default function MairieReplyScreen() {
     );
   }
 
-  const submit = () => {
+  const submit = async () => {
     setSubmitted(true);
-    if (!isValid) {
+    if (!isValid || !nouveauStatut) {
       Alert.alert('Réponse incomplète', 'Vérifie la réponse, le statut, le service et le délai.');
       return;
     }
-    Alert.alert(
-      'Réponse envoyée',
-      `La réponse sera publiée dans le dossier${proposerRdv ? ' avec une proposition de rendez-vous' : ''}.`,
-      [{ text: 'OK', onPress: () => router.replace('/mairie/dashboard') }],
-    );
+    const mairieAgent = PERSONNES.find((p) => p.role === 'mairie_admin') ?? PERSONNES[0];
+    try {
+      await updateStatut.mutateAsync({
+        dossierId: dossier.id,
+        statut: nouveauStatut,
+        acteurNom: `${mairieAgent.prenom} ${mairieAgent.nom}`,
+        description: actionPrevue
+          ? `Réponse mairie : ${actionPrevue}`
+          : `Statut mis à jour (${nouveauStatut})`,
+      });
+      await createMessage.mutateAsync({
+        titre: `Réponse : ${dossier.titre}`,
+        contenu: reponse,
+        expediteur: `${mairieAgent.prenom} ${mairieAgent.nom} — Mairie`,
+        priorite: proposerRdv ? 'importante' : 'normale',
+        visibilityScope: dossier.visibilityScope,
+      });
+      Alert.alert(
+        'Réponse envoyée',
+        `La réponse a été publiée dans le dossier${proposerRdv ? ' avec une proposition de rendez-vous' : ''}.`,
+        [{ text: 'OK', onPress: () => router.replace('/mairie/dashboard') }],
+      );
+    } catch (err) {
+      Alert.alert('Erreur', err instanceof Error ? err.message : 'Échec de l’envoi.');
+    }
   };
 
   return (

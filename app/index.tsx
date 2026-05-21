@@ -1,21 +1,39 @@
+import { useState } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, type Href } from 'expo-router';
-import { ChevronRight, HelpCircle, Shield, Sparkles } from 'lucide-react-native';
+import { ChevronRight, HelpCircle, Shield, Sparkles, Users } from 'lucide-react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { GRADIENTS } from '../constants/theme';
 import { USE_SUPABASE } from '../services/_config';
+import { DemoPersonneSelector } from '../components/DemoPersonneSelector';
+import { PERSONNES, setCurrentUser } from '../data/mockData';
+import type { Role } from '../types';
 
 // Routes des boutons "Je suis X" selon le mode (mock vs Supabase Auth).
-// En mode mock : accès direct à la zone, pour que les tests E2E et le dev local
-// continuent sans avoir besoin d'auth. En mode Supabase : passe par /sign-in.
+// En mode mock : accès direct à la zone (préserve les tests E2E) + on aligne
+// l'utilisateur courant sur le rôle choisi (pour que profil + composer reflètent
+// le bon personnage). En mode Supabase : passe par /sign-in.
 const mairieRoute: Href = USE_SUPABASE
   ? ('/sign-in?role=mairie' as Href)
   : ('/mairie/dashboard' as Href);
 const directionRoute: Href = USE_SUPABASE
   ? ('/sign-in?role=direction' as Href)
   : ('/direction/home' as Href);
+
+// Pick le premier personnage qui matche un rôle (utile en mode démo direct).
+function firstPersonneForRole(role: Role): string | null {
+  return PERSONNES.find((p) => p.role === role)?.id ?? null;
+}
+
+function goToZone(href: Href, role?: Role) {
+  if (!USE_SUPABASE && role) {
+    const id = firstPersonneForRole(role);
+    if (id) setCurrentUser(id);
+  }
+  router.push(href);
+}
 
 // SVG inline pour matcher les icônes du web mockup (cohérence visuelle stricte)
 function SchoolIcon({ size = 40, color = '#ffffff' }: { size?: number; color?: string }) {
@@ -88,6 +106,7 @@ function GraduationIcon({ size = 20 }: { size?: number }) {
 
 export default function WelcomeScreen() {
   const insets = useSafeAreaInsets();
+  const [demoOpen, setDemoOpen] = useState(false);
   return (
     <LinearGradient
       colors={GRADIENTS.header as unknown as [string, string, ...string[]]}
@@ -195,7 +214,7 @@ export default function WelcomeScreen() {
           </Pressable>
 
           <Pressable
-            onPress={() => router.push(mairieRoute)}
+            onPress={() => goToZone(mairieRoute, 'mairie_admin')}
             style={({ pressed }) => ({
               opacity: pressed ? 0.85 : 1,
               transform: [{ scale: pressed ? 0.98 : 1 }],
@@ -219,7 +238,7 @@ export default function WelcomeScreen() {
           </Pressable>
 
           <Pressable
-            onPress={() => router.push(directionRoute)}
+            onPress={() => goToZone(directionRoute, 'direction')}
             style={({ pressed }) => ({
               opacity: pressed ? 0.85 : 1,
               transform: [{ scale: pressed ? 0.98 : 1 }],
@@ -262,6 +281,21 @@ export default function WelcomeScreen() {
             </Pressable>
           </View>
 
+          {/* Bouton Mode démo (visible uniquement en mode mock pour ne pas polluer la prod) */}
+          {!USE_SUPABASE && (
+            <Pressable
+              onPress={() => setDemoOpen(true)}
+              hitSlop={6}
+              className="flex-row items-center justify-center gap-1.5 mt-3 self-center px-4 py-2 rounded-full border border-white/20"
+              style={{ backgroundColor: 'rgba(255,255,255,0.08)' }}
+            >
+              <Users size={12} color="rgba(255,255,255,0.7)" />
+              <Text className="text-white/70 text-[11px] font-medium">
+                Mode démo : tester un autre rôle
+              </Text>
+            </Pressable>
+          )}
+
           {/* Mentions légales en bas, discret */}
           <View className="flex-row justify-center gap-3 pt-3">
             <Pressable onPress={() => router.push('/legal/mentions' as Href)} hitSlop={6}>
@@ -278,6 +312,8 @@ export default function WelcomeScreen() {
           </View>
         </View>
       </ScrollView>
+
+      <DemoPersonneSelector visible={demoOpen} onClose={() => setDemoOpen(false)} />
     </LinearGradient>
   );
 }

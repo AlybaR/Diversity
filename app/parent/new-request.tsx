@@ -8,7 +8,8 @@ import { TextInputField } from '../../components/TextInputField';
 import { SelectField, type SelectOption } from '../../components/SelectField';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { SecondaryButton } from '../../components/SecondaryButton';
-import { CATEGORIES, URGENCES } from '../../data/mockData';
+import { CATEGORIES, URGENCES, UTILISATEUR_COURANT } from '../../data/mockData';
+import { useCreateDossier } from '../../hooks/useDossiers';
 import type { Categorie, Urgence } from '../../types';
 
 const CATEGORIE_OPTIONS: SelectOption<Categorie>[] = CATEGORIES.map((c) => ({
@@ -49,6 +50,7 @@ export default function NewRequestScreen() {
   const [urgence, setUrgence] = useState<Urgence>('moyenne');
   const [nbPieces, setNbPieces] = useState(0);
   const [submitted, setSubmitted] = useState(false);
+  const createDossier = useCreateDossier();
 
   const isValid = categorie !== null && titre.trim().length >= 5 && description.trim().length >= 10;
 
@@ -74,18 +76,34 @@ export default function NewRequestScreen() {
     );
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     setSubmitted(true);
-    if (!isValid) {
+    if (!isValid || categorie === null) {
       Alert.alert(
         'Demande incomplète',
         'Choisis une catégorie, un titre (≥ 5) et une description (≥ 10).',
       );
       return;
     }
-    Alert.alert('Demande transmise', 'La mairie a bien reçu votre demande.', [
-      { text: 'OK', onPress: () => router.replace('/parent/dossiers') },
-    ]);
+    try {
+      await createDossier.mutateAsync({
+        titre,
+        categorie,
+        urgence,
+        description,
+        ecoleId: UTILISATEUR_COURANT.ecoleId ?? 'ecole-jaures',
+        createurId: UTILISATEUR_COURANT.id,
+        createurNomComplet: `${UTILISATEUR_COURANT.prenom} ${UTILISATEUR_COURANT.nom}`,
+        // Par défaut un parent qui ouvre un dossier s'adresse à la mairie ;
+        // visible par les parents élus + mairie (pas par la direction tant que pas partagé).
+        visibilityScope: 'parents_mairie',
+      });
+      Alert.alert('Demande transmise', 'La mairie a bien reçu votre demande.', [
+        { text: 'OK', onPress: () => router.replace('/parent/dossiers') },
+      ]);
+    } catch (err) {
+      Alert.alert('Erreur', err instanceof Error ? err.message : 'Échec de la transmission.');
+    }
   };
 
   const urgenceColor = URGENCE_COLORS[urgence];

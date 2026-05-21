@@ -12,7 +12,8 @@ import { SecondaryButton } from '../../components/SecondaryButton';
 import { SelectField, type SelectOption } from '../../components/SelectField';
 import { TextInputField } from '../../components/TextInputField';
 import { COLORS } from '../../constants/theme';
-import { useDossiers, useRendezVous } from '../../hooks';
+import { useCreateRendezVous, useDossiers, useRendezVous } from '../../hooks';
+import { UTILISATEUR_COURANT } from '../../data/mockData';
 
 const CRENEAUX = ['Mercredi 27 mai · 17h30', 'Jeudi 28 mai · 18h00', 'Vendredi 29 mai · 08h30'];
 
@@ -41,20 +42,47 @@ export default function AppointmentsScreen() {
   const aVenir = rdvs.filter((r) => r.statut === 'confirme');
   const demandes = rdvs.filter((r) => r.statut === 'demande' || r.statut === 'creneaux_proposes');
 
-  const handleSubmit = () => {
+  const createRendezVous = useCreateRendezVous();
+
+  const handleSubmit = async () => {
     if (titre.trim().length < 5) {
       Alert.alert('Titre manquant', 'Donnez un objet clair à votre demande de rendez-vous.');
       return;
     }
-    setModalOpen(false);
-    setTitre('');
-    setDossierId(null);
-    setCreneau(CRENEAUX[0]);
-    setPrecision('');
-    Alert.alert(
-      'Demande envoyée',
-      'La mairie recevra la demande avec les créneaux proposés dès que le backend sera branché.',
-    );
+    // Le créneau est libellé "Mercredi 27 mai · 17h30" ; on split sur ·
+    const [datePart = creneau, heurePart = ''] = creneau.split('·').map((s) => s.trim());
+    const linkedDossier =
+      dossierId && dossierId !== 'sans-dossier'
+        ? dossiers.find((d) => d.id === dossierId)
+        : undefined;
+    try {
+      await createRendezVous.mutateAsync({
+        titre,
+        date: datePart,
+        heure: heurePart,
+        lieu: 'Hôtel de ville — à confirmer',
+        participantsNoms: [
+          `${UTILISATEUR_COURANT.prenom} ${UTILISATEUR_COURANT.nom}`,
+          'Service éducation',
+        ],
+        dossierLieId: linkedDossier?.id,
+        dossierLieTitre: linkedDossier?.titre,
+        visibilityScope: 'parents_mairie',
+      });
+      setModalOpen(false);
+      setTitre('');
+      setDossierId(null);
+      setCreneau(CRENEAUX[0]);
+      setPrecision('');
+      Alert.alert(
+        'Demande envoyée',
+        precision
+          ? `La mairie recevra la demande avec votre précision : « ${precision} ».`
+          : 'La mairie recevra la demande avec les créneaux proposés.',
+      );
+    } catch (err) {
+      Alert.alert('Erreur', err instanceof Error ? err.message : 'Échec de la création.');
+    }
   };
 
   return (

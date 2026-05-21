@@ -5,6 +5,156 @@ Le projet web `mockups-app/` n'est jamais modifié.
 
 ---
 
+## 2026-05-21 — Étape 21 : Démo Passerelle utilisable en 3-4 jours
+
+### Contexte
+
+Pivot d'intention : l'utilisateur n'a pas besoin de mettre en production maintenant — il a besoin de **présenter l'app sur son téléphone dans 3-4 jours** pour la montrer à des décideurs/pilotes. Les phases 1-4 (Supabase + auth + robustesse + légal) sont déjà poussées sur leurs branches respectives, mais elles visaient une vraie prod. Cette étape transforme le mode mock existant en démo utilisable autonome, sans dépendre d'un backend.
+
+But concret : « Voilà ce que voit un parent, voilà ce que voit la mairie, voilà ce que voit la direction ».
+
+### Étape 1 — Bascule mode démo
+
+- **`.env.local`** : `EXPO_PUBLIC_USE_SUPABASE=false` (était `true`, ce qui activait l'auth Supabase réelle et cassait la démo).
+- `services/_config.ts` lit ce flag au boot. Tout en aval (`AuthGuard`, services, hooks) bascule automatiquement en mode mock.
+
+### Étape 2 — Mutations mock pour actions clés
+
+Avant : les écrans de création (`new-request`, `messages`, `appointments`, `reply`) affichaient juste `Alert.alert('Demande envoyée')` sans rien faire. Après : les items créés apparaissent **immédiatement** dans les listes destinataires (RAM seulement, perdu au refresh).
+
+**Services étendus** :
+
+- `services/dossiers.ts` : `createDossier(input)` + `addCommentaire(input)` + `updateDossierStatut(input)` + `shareDossierTripartite(input)` — mutent `DOSSIERS[]` directement.
+- `services/messages.ts` : `createMessage(input)` + `markMessageAsRead(id)`.
+- `services/rendezVous.ts` : `createRendezVous(input)` + `updateRendezVousStatut(input)`.
+
+**Hooks ajoutés** :
+
+- `useCreateDossier`, `useAddCommentaire`, `useUpdateDossierStatut`, `useShareDossierTripartite`
+- `useCreateMessage`, `useMarkRead`
+- `useCreateRendezVous`, `useUpdateRendezVousStatut`
+
+Tous les hooks de mutation `invalidateQueries({queryKey: ['dossiers'|'messages'|'rendez-vous']})` pour forcer le refetch des listes.
+
+**Écrans branchés** :
+
+- `app/parent/new-request.tsx` → `useCreateDossier` avec scope `parents_mairie`
+- `app/direction/new-request.tsx` → `useCreateDossier` avec scope `direction_mairie`
+- `app/parent/messages.tsx` (composer) → `useCreateMessage`
+- `app/parent/appointments.tsx` (modal RDV) → `useCreateRendezVous`
+- `app/mairie/reply.tsx` → `useUpdateDossierStatut` + `useCreateMessage` (la réponse mairie crée un message + met à jour le statut + ajoute un event dans l'historique)
+- `app/parent/message-detail.tsx` (bouton « Marquer comme lu ») → `useMarkRead`
+
+### Étape 3 — Faux login + sélecteur de personnage
+
+**`data/mockData.ts`** : transformation de `UTILISATEUR_COURANT` en Proxy qui délègue à un `_currentUser` mutable. Permet de switcher le personnage actif sans refondre les 5+ écrans qui importent `UTILISATEUR_COURANT.prenom` etc. — chaque accès intercepte la valeur actuelle.
+
+**`hooks/useDemoUser.ts`** (nouveau) : hook qui :
+
+- Lit `getCurrentUser()` (synchronisé via `useSyncExternalStore`)
+- Expose `switchTo(personneId, { redirect? })` qui mute `_currentUser` + invalide tous les caches React Query + redirige vers la home du rôle
+
+**`components/DemoPersonneSelector.tsx`** (nouveau) : sheet modal qui liste les 5 personnes mock (Nadia parent_admin / Marc parent_contrib / Claire mairie_admin / Thomas elu / Mme Girard direction) avec leur fonction, école, initiales. Tap = `switchTo(id)`.
+
+**`app/auth/callback-demo.tsx`** (nouveau) : faux callback magic link. Reçoit `?role=mairie|direction|parent` en query, pick le premier personnage matching, set comme courant, redirige vers la home.
+
+**Faux flow magic link** :
+
+- `app/sign-in/index.tsx` : si `!USE_SUPABASE`, le bouton « Recevoir le lien » ne fait AUCUN appel réseau — il navigue directement vers `/sign-in/sent?demo=1`.
+- `app/sign-in/sent.tsx` : si `demo=1`, affiche un encart « Mode démo : aucun email n'est réellement envoyé » + bouton « Continuer la démo » qui navigue vers `/auth/callback-demo`.
+
+**Sélecteur visible** :
+
+- `app/index.tsx` (Welcome) : bouton « 🎭 Mode démo : tester un autre rôle » entre le footer aide et les mentions légales (uniquement si `!USE_SUPABASE`). Ouvre `<DemoPersonneSelector />`.
+- `app/index.tsx` : les boutons « Je suis une mairie / direction » en mode mock alignent `_currentUser` sur le rôle avant de naviguer (sinon le profil afficherait Nadia dans la zone mairie).
+- `app/parent/profile.tsx` : section « Mode démo » ajoutée avec le bouton « Changer de personnage » (uniquement si `!USE_SUPABASE`).
+
+### Étape 4 — 3 placeholders mairie réécrits
+
+Identifiés par l'exploration comme bloquants pour le parcours mairie. Tous étaient `<BlueprintRoute id="..." />`.
+
+- **`app/mairie/dossier-detail.tsx`** (255 → ~270 lignes) — vue mairie d'un dossier. Récupère le dossier via `useDossier(id)`, affiche titre / catégorie / statut / urgence / scope, contexte (école, créateur, MAJ), pièces jointes, historique, commentaires (avec composer mairie en local), boutons « Répondre au dossier » → `/mairie/reply` et « Partager en tripartite » (avec confirmation explicite que l'historique deviendra visible). Couleurs teal.
+- **`app/mairie/messages.tsx`** — boîte de réception. Liste tous les messages filtrés par `visibleByRole: 'mairie_admin'`. États loading/error/empty intégrés (composants Phase 3).
+- **`app/mairie/rendez-vous.tsx`** — agenda mairie. Sections « À traiter » (demandes + créneaux proposés), « Confirmés », « Passés ». Bouton « Confirmer ce créneau » sur chaque demande → mute le statut en `confirme`.
+
+### Étape 5 — Déploiement
+
+- **`package.json`** : ajout du script `build:web` = `expo export --platform web --output-dir dist`. Le bundle web est prêt à être déployé sur Cloudflare Pages.
+- `dist/` est déjà gitignored.
+
+**Cloudflare Pages** (à configurer côté Cloudflare une fois) :
+
+- Build command : `cd mobile-app && npm install --legacy-peer-deps && npm run build:web`
+- Output directory : `mobile-app/dist`
+- Env var : `EXPO_PUBLIC_USE_SUPABASE=false`
+- URL : `https://passerelle-demo.pages.dev`
+
+**Expo Go** (déjà fonctionnel) : `npm start` lance Metro, scanner le QR depuis l'app Expo Go.
+
+### Étape 6 — DEMO_GUIDE.md (nouveau)
+
+Guide pratique pour la présentation :
+
+- Checklist 5 min avant la démo
+- 3 scénarios chronométrés (parcours parent 5 min, vue mairie 5 min, vue direction 3 min) + bonus légal
+- Phrases-clés à dire pendant la démo (canaux, RLS, RGPD)
+- Procédure Expo Go (commande locale)
+- Procédure Cloudflare Pages (configuration une fois + redéploiement automatique à chaque push)
+- Troubleshooting
+- Annexe architecture mode démo
+
+### Fichiers créés
+
+| Fichier | Rôle |
+| --- | --- |
+| `hooks/useDemoUser.ts` | Hook de bascule de personnage en mode démo |
+| `components/DemoPersonneSelector.tsx` | Sheet modal de sélection |
+| `app/auth/callback-demo.tsx` | Faux callback magic link |
+| `app/mairie/dossier-detail.tsx` | Vue détail mairie (était placeholder) |
+| `app/mairie/messages.tsx` | Boîte de réception mairie (était placeholder) |
+| `app/mairie/rendez-vous.tsx` | Agenda mairie (était placeholder) |
+| `DEMO_GUIDE.md` | Guide de présentation |
+
+### Fichiers modifiés
+
+- `.env.local` : `USE_SUPABASE=false`
+- `package.json` : script `build:web`
+- `services/dossiers.ts`, `services/messages.ts`, `services/rendezVous.ts` : mutations create/update
+- `hooks/useDossiers.ts`, `hooks/useMessages.ts`, `hooks/useRendezVous.ts` : hooks de mutation
+- `data/mockData.ts` : Proxy `UTILISATEUR_COURANT` + `getCurrentUser`/`setCurrentUser`/`resetCurrentUser`
+- `app/sign-in/index.tsx`, `app/sign-in/sent.tsx` : bypass mock + bouton « Continuer la démo »
+- `app/index.tsx` (Welcome) : bouton « Mode démo » + alignement utilisateur sur clic rôle
+- `app/parent/profile.tsx` : section « Mode démo > Changer de personnage »
+- `app/parent/new-request.tsx`, `app/direction/new-request.tsx` : `useCreateDossier`
+- `app/parent/messages.tsx` : `useCreateMessage`
+- `app/parent/appointments.tsx` : `useCreateRendezVous`
+- `app/mairie/reply.tsx` : `useUpdateDossierStatut` + `useCreateMessage`
+- `app/parent/message-detail.tsx` : `useMarkRead`
+
+### Vérifications
+
+- ✅ `npm run typecheck` exit 0
+- ✅ `npm run lint` exit 0 (0 erreur, 0 warning après lint:fix)
+- ✅ `npm run bundle:check` exit 0 (web bundle ~4.4 MB)
+- ⏳ Test E2E Playwright : à relancer côté CI ; le clic « Je suis une mairie / direction » continue d'aller direct à la zone (préservation des assertions M1/D1). Si la navigation change après merge, adapter les helpers.
+- ⏳ Test manuel sur téléphone via Expo Go + via URL Cloudflare (à faire dès que le projet CF Pages sera créé)
+
+### Limites assumées
+
+- **Refresh = reset** : volatile RAM uniquement. C'est OK pour une démo dirigée. Pour persister, ajouter AsyncStorage dans `setCurrentUser` + persister les arrays mock.
+- **Profil mairie et direction** : restent `BlueprintRoute`. Si quelqu'un tape sur l'avatar mairie/direction, il voit le placeholder. Solution rapide : faire pointer ces avatars vers le DemoPersonneSelector.
+- **19 placeholders annexes** (conseil-école, bilan-annuel, transfert-admin, etc.) restent visibles via les sous-menus. Pas critique pour une démo de 15-30 min dirigée.
+- **Pas de search réel, pas de notifications réelles** : icônes loupe / cloche tombent toujours sur des placeholders.
+- **Compte de démo** : 5 personnes en dur dans `data/mockData.ts`. Pour une démo plus crédible, on pourrait éditer leurs noms/emails pour matcher les vrais pilotes.
+
+### Stratégie de fallback le jour J
+
+- **Plan A** : URL Cloudflare Pages (partageable, fonctionne n'importe où)
+- **Plan B** : Expo Go avec laptop sur le même Wi-Fi
+- **Plan C** : si le 2 foirent, screenshot des écrans + storytelling
+
+---
+
 ## 2026-05-21 — Étape 20 : Phase 4 — Légal & contenu (CGU, RGPD, mentions, aide, profil parent)
 
 ### Contexte

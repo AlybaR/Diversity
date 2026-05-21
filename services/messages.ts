@@ -1,4 +1,4 @@
-import type { Message, Role, VisibilityScope } from '../types';
+import type { Message, PrioriteMessage, Role, VisibilityScope } from '../types';
 import { canRoleSeeScope } from '../types';
 import { MESSAGES } from '../data/mockData';
 import { mockAsync, USE_SUPABASE } from './_config';
@@ -27,5 +27,48 @@ export function listMessages(filter: MessageFilter = {}): Promise<Message[]> {
 export function getMessageById(id: string): Promise<Message | null> {
   if (USE_SUPABASE) return getMessageByIdFromSupabase(id);
   const message = MESSAGES.find((m) => m.id === id) ?? null;
+  return mockAsync(message);
+}
+
+// =============================================================================
+// MUTATIONS — mode démo uniquement
+// =============================================================================
+
+export interface CreateMessageInput {
+  titre: string;
+  contenu: string;
+  expediteur: string;
+  priorite?: PrioriteMessage;
+  visibilityScope: VisibilityScope;
+}
+
+export function createMessage(input: CreateMessageInput): Promise<Message> {
+  if (USE_SUPABASE) {
+    return Promise.reject(new Error('createMessage non implémenté en mode Supabase (démo only)'));
+  }
+  const now = new Date();
+  const message: Message = {
+    id: `message-${now.getTime()}`,
+    titre: input.titre,
+    expediteur: input.expediteur,
+    date: now.toISOString(),
+    priorite: input.priorite ?? 'normale',
+    contenu: input.contenu,
+    lu: false,
+    visibilityScope: input.visibilityScope,
+  };
+  MESSAGES.unshift(message);
+  return mockAsync(message);
+}
+
+export function markMessageAsRead(id: string): Promise<Message | null> {
+  if (USE_SUPABASE) {
+    return Promise.reject(
+      new Error('markMessageAsRead non implémenté en mode Supabase (démo only)'),
+    );
+  }
+  const message = MESSAGES.find((m) => m.id === id);
+  if (!message) return mockAsync(null);
+  message.lu = true;
   return mockAsync(message);
 }

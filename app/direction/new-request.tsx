@@ -10,6 +10,7 @@ import { SecondaryButton } from '../../components/SecondaryButton';
 import { SelectField, type SelectOption } from '../../components/SelectField';
 import { TextInputField } from '../../components/TextInputField';
 import { CATEGORIES, ECOLES, PERSONNES } from '../../data/mockData';
+import { useCreateDossier } from '../../hooks/useDossiers';
 import type { Categorie, Urgence } from '../../types';
 
 const DIRECTION = PERSONNES.find((p) => p.role === 'direction');
@@ -26,24 +27,44 @@ export default function DirectionNewRequestScreen() {
   const [description, setDescription] = useState('');
   const [categorie, setCategorie] = useState<Categorie | null>(null);
   const [urgence, setUrgence] = useState<Urgence>('moyenne');
+  const createDossier = useCreateDossier();
 
   const categorieOptions = useMemo<SelectOption<Categorie>[]>(
     () => CATEGORIES.map((c) => ({ value: c.value, label: c.label })),
     [],
   );
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const missing: string[] = [];
     if (titre.trim().length < 5) missing.push('un titre clair (5 caractères min.)');
     if (description.trim().length < 10) missing.push('une description (10 caractères min.)');
     if (!categorie) missing.push('une catégorie');
-    if (missing.length > 0) {
+    if (missing.length > 0 || categorie === null) {
       Alert.alert('Sujet incomplet', `Merci d'ajouter ${missing.join(', ')}.`);
       return;
     }
-    Alert.alert('Sujet transmis', 'Le sujet a été transmis à la mairie.', [
-      { text: 'OK', onPress: () => router.replace('/direction/dossiers' as Href) },
-    ]);
+    if (!DIRECTION) {
+      Alert.alert('Erreur', 'Impossible d’identifier la direction de l’école.');
+      return;
+    }
+    try {
+      await createDossier.mutateAsync({
+        titre,
+        categorie,
+        urgence,
+        description,
+        ecoleId: ECOLE_DIRECTION.id,
+        createurId: DIRECTION.id,
+        createurNomComplet: `${DIRECTION.prenom} ${DIRECTION.nom}`,
+        // La direction ouvre par défaut un sujet privé direction↔mairie.
+        visibilityScope: 'direction_mairie',
+      });
+      Alert.alert('Sujet transmis', 'Le sujet a été transmis à la mairie.', [
+        { text: 'OK', onPress: () => router.replace('/direction/dossiers' as Href) },
+      ]);
+    } catch (err) {
+      Alert.alert('Erreur', err instanceof Error ? err.message : 'Échec de la transmission.');
+    }
   };
 
   return (

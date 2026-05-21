@@ -124,7 +124,57 @@ export const PERSONNES: Personne[] = [
   },
 ];
 
-export const UTILISATEUR_COURANT = PERSONNES[0]; // Nadia Benali (parent administrateur)
+// =============================================================================
+// Utilisateur courant (mode démo)
+// =============================================================================
+// Source unique de "qui suis-je" en mode mock. À la racine du module pour qu'on
+// puisse le muter dynamiquement (via setCurrentUser) et que tous les écrans qui
+// importent `UTILISATEUR_COURANT` voient la nouvelle valeur grâce au Proxy.
+//
+// Pourquoi ce design :
+//   - L'app a 5 personnes mockées avec 5 rôles. En démo, on veut basculer entre
+//     elles en 2 taps (DemoPersonneSelector) sans refondre tous les écrans.
+//   - Si on exposait directement une const `UTILISATEUR_COURANT = PERSONNES[0]`,
+//     reassign dans setCurrentUser ne mettrait pas à jour les imports déjà résolus.
+//   - Le Proxy intercepte les accès à .prenom/.nom/etc. et délègue à la valeur
+//     actuelle de `_currentUser`.
+//
+// Production réelle : remplacer ce mécanisme par `useSession().personne`. Le
+// Proxy n'est utile QUE pour la démo en mode mock.
+
+let _currentUser: Personne = PERSONNES[0]; // Nadia (parent_admin) par défaut
+
+export function getCurrentUser(): Personne {
+  return _currentUser;
+}
+
+export function setCurrentUser(personneId: string): Personne | null {
+  const found = PERSONNES.find((p) => p.id === personneId);
+  if (!found) return null;
+  _currentUser = found;
+  return found;
+}
+
+export function resetCurrentUser(): void {
+  _currentUser = PERSONNES[0];
+}
+
+// Proxy qui délègue à _currentUser. Les imports `UTILISATEUR_COURANT` voient
+// toujours la valeur actuelle, même après un setCurrentUser().
+export const UTILISATEUR_COURANT: Personne = new Proxy({} as Personne, {
+  get(_, prop) {
+    return _currentUser[prop as keyof Personne];
+  },
+  has(_, prop) {
+    return prop in _currentUser;
+  },
+  ownKeys() {
+    return Object.keys(_currentUser);
+  },
+  getOwnPropertyDescriptor(_, prop) {
+    return Object.getOwnPropertyDescriptor(_currentUser, prop);
+  },
+});
 
 export const CONTACTS_MAIRIE: ContactMairie[] = [
   {

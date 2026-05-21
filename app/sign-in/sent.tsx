@@ -3,19 +3,22 @@ import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams, type Href } from 'expo-router';
-import { ArrowLeft, CheckCircle2, Mail } from 'lucide-react-native';
+import { ArrowLeft, CheckCircle2, Mail, Sparkles } from 'lucide-react-native';
 import { GRADIENTS } from '../../constants/theme';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { SecondaryButton } from '../../components/SecondaryButton';
 import { supabase } from '../../lib/supabase';
+import { USE_SUPABASE } from '../../services/_config';
 
 export default function SignInSentScreen() {
   const insets = useSafeAreaInsets();
-  const { email, role, ecole } = useLocalSearchParams<{
+  const { email, role, ecole, demo } = useLocalSearchParams<{
     email?: string;
     role?: string;
     ecole?: string;
+    demo?: string;
   }>();
+  const isDemo = demo === '1' || !USE_SUPABASE;
   const [resending, setResending] = useState(false);
   const [resent, setResent] = useState(false);
 
@@ -104,8 +107,38 @@ export default function SignInSentScreen() {
           </View>
         )}
 
+        {isDemo && (
+          <View
+            className="rounded-xl p-3 border mb-4"
+            style={{ backgroundColor: '#fef3c7', borderColor: '#fde68a' }}
+          >
+            <View className="flex-row items-start gap-2">
+              <Sparkles color="#d97706" size={14} style={{ marginTop: 2 }} />
+              <Text className="flex-1 text-amber-700 text-xs leading-relaxed">
+                <Text className="font-bold">Mode démo</Text> : aucun email n’est réellement envoyé.
+                Clique sur « Continuer la démo » pour simuler le clic du lien.
+              </Text>
+            </View>
+          </View>
+        )}
+
         <View className="gap-3 mt-2">
-          <PrimaryButton label={resending ? 'Envoi…' : 'Renvoyer le lien'} onPress={handleResend} />
+          {isDemo ? (
+            <PrimaryButton
+              label="Continuer la démo"
+              onPress={() =>
+                router.replace({
+                  pathname: '/auth/callback-demo',
+                  params: { role },
+                } as unknown as Href)
+              }
+            />
+          ) : (
+            <PrimaryButton
+              label={resending ? 'Envoi…' : 'Renvoyer le lien'}
+              onPress={handleResend}
+            />
+          )}
           <SecondaryButton
             label="Changer d'email"
             onPress={() =>

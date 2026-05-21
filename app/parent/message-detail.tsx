@@ -6,12 +6,13 @@ import { Badge } from '../../components/Badge';
 import { BottomNav } from '../../components/BottomNav';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { SecondaryButton } from '../../components/SecondaryButton';
-import { useMessage } from '../../hooks';
+import { useMarkRead, useMessage } from '../../hooks';
 import { canRoleSeeScope } from '../../types';
 
 export default function MessageDetailScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
   const { data: specificMessage } = useMessage(id);
+  const markRead = useMarkRead();
   // Pas de fallback sur messages[0] : sinon le guard d'accès plus bas serait masqué
   // pendant le loading et un parent verrait un autre message à la place de "Accès refusé".
   const message = specificMessage;
@@ -100,9 +101,19 @@ export default function MessageDetailScreen() {
             }
           />
           <SecondaryButton
-            label="Marquer comme lu"
+            label={message.lu ? 'Lu ✓' : 'Marquer comme lu'}
             iconLeft={<CheckCheck color="#334155" size={18} />}
-            onPress={() => Alert.alert('Message marqué comme lu', 'État simulé dans la démo.')}
+            onPress={async () => {
+              if (message.lu) return;
+              try {
+                await markRead.mutateAsync(message.id);
+              } catch (err) {
+                Alert.alert(
+                  'Erreur',
+                  err instanceof Error ? err.message : 'Impossible de marquer comme lu.',
+                );
+              }
+            }}
           />
           <SecondaryButton
             label="Retour aux messages"
