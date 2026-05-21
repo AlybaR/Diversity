@@ -12,16 +12,21 @@ import { AppHeader } from '../../components/AppHeader';
 import { Badge } from '../../components/Badge';
 import { BottomNav } from '../../components/BottomNav';
 import { Card } from '../../components/Card';
-import { CATEGORIES, DOSSIERS, ECOLES } from '../../data/mockData';
+import { CATEGORIES } from '../../data/mockData';
+import { useDossiers, useEcoles } from '../../hooks';
 
 const recurrentTopics = ['Sécurité piétons', 'État des sanitaires', 'Carte scolaire'];
 
 export default function MairieStatsScreen() {
+  // Stats agrégées via hooks pour cache partagé. CATEGORIES reste en import
+  // direct (enum référentiel, pas de mutation).
+  const { data: dossiers = [] } = useDossiers();
+  const { data: ecoles = [] } = useEcoles();
   const maxDossiers = Math.max(
     1,
-    ...ECOLES.map((ecole) => DOSSIERS.filter((dossier) => dossier.ecoleId === ecole.id).length),
+    ...ecoles.map((ecole) => dossiers.filter((dossier) => dossier.ecoleId === ecole.id).length),
   );
-  const urgentCount = DOSSIERS.filter(
+  const urgentCount = dossiers.filter(
     (dossier) => dossier.urgence === 'elevee' && dossier.statut !== 'resolu',
   ).length;
 
@@ -35,8 +40,8 @@ export default function MairieStatsScreen() {
             <Text className="text-slate-400 text-xs font-bold uppercase">Par école</Text>
           </View>
           <View className="gap-3">
-            {ECOLES.map((ecole) => {
-              const count = DOSSIERS.filter((dossier) => dossier.ecoleId === ecole.id).length;
+            {ecoles.map((ecole) => {
+              const count = dossiers.filter((dossier) => dossier.ecoleId === ecole.id).length;
               const pct = Math.max(8, (count / maxDossiers) * 100);
               return (
                 <View key={ecole.id}>
@@ -64,7 +69,7 @@ export default function MairieStatsScreen() {
           <View className="flex-row flex-wrap" style={{ gap: 8 }}>
             {CATEGORIES.slice(0, 4).map((category, index) => {
               const count =
-                DOSSIERS.filter((dossier) => dossier.categorie === category.value).length +
+                dossiers.filter((dossier) => dossier.categorie === category.value).length +
                 (index === 0 ? 2 : index);
               const colors = ['#ef4444', '#2563eb', '#d97706', '#7c3aed'];
               return (

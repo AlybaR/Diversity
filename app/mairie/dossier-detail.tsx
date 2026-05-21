@@ -21,8 +21,8 @@ import { StatutBadge, UrgenceBadge } from '../../components/StatusBadge';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { SecondaryButton } from '../../components/SecondaryButton';
 import { TextInputField } from '../../components/TextInputField';
-import { CATEGORIES, COMMENTAIRES_DOSSIER, PIECES_JOINTES, PERSONNES } from '../../data/mockData';
-import { useDossier, useEcole, useShareDossierTripartite } from '../../hooks';
+import { CATEGORIES, COMMENTAIRES_DOSSIER, PIECES_JOINTES } from '../../data/mockData';
+import { useDossier, useEcole, usePersonnes, useShareDossierTripartite } from '../../hooks';
 import { scopeShortLabel, type CommentaireDossier } from '../../types';
 
 export default function MairieDossierDetailScreen() {
@@ -30,7 +30,8 @@ export default function MairieDossierDetailScreen() {
   const { data: specificDossier } = useDossier(id);
   const dossier = specificDossier;
   const { data: ecole } = useEcole(dossier?.ecoleId);
-  const createur = PERSONNES.find((p) => p.id === dossier?.createurId);
+  const { data: personnes = [] } = usePersonnes();
+  const createur = personnes.find((p) => p.id === dossier?.createurId);
   const categorie = CATEGORIES.find((c) => c.value === dossier?.categorie);
   const [commentaire, setCommentaire] = useState('');
   const [commentairesLocaux, setCommentairesLocaux] = useState<CommentaireDossier[]>([]);

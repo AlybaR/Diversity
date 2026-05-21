@@ -1587,6 +1587,58 @@ direction/new-request).
 
 ---
 
+## 2026-05-21 — Étape 15.D : Migration mockData terminée (4 écrans secondaires)
+
+### Contexte
+Suite de l'Étape 15.C où on avait migré 3 écrans. Il restait 5 écrans avec `import { DOSSIERS|MESSAGES|RENDEZ_VOUS|PERSONNES } from '../../data/mockData'` qui bypassaient les hooks. Cette étape les finalise.
+
+### Migrations
+- `app/mairie/mode-elu.tsx` : `DOSSIERS`, `ECOLES`, `RENDEZ_VOUS` → `useDossiers()`, `useEcoles()`, `useRendezVous()`. Vue stratégique élu bénéficie du cache partagé avec les autres écrans mairie.
+- `app/mairie/stats.tsx` : `DOSSIERS`, `ECOLES` → hooks. Les graphes par école et par catégorie reflètent les ajouts de dossiers faits en démo.
+- `app/parent/passage-annee.tsx` : `DOSSIERS`, `PERSONNES` → `useDossiers()`, `usePersonnes({ representantsOnly: true })`. Plus complexe : ajout d'un `useEffect` qui synchronise l'état local `members` quand la liste serveur change (préserve les décisions `keep` de l'utilisateur entre re-fetches).
+- `app/mairie/dossier-detail.tsx` : `PERSONNES.find(createurId)` → `usePersonnes()` + `personnes.find(...)`. Cohérent avec le pattern de `parent/dossier-detail.tsx` et `direction/dossier-detail.tsx`.
+
+### Imports `mockData` restants — tous légitimes
+Audit final :
+
+| Catégorie | Imports | Justification |
+| --- | --- | --- |
+| Enums référentiels | `CATEGORIES`, `URGENCES`, `STATUTS_DOSSIER`, `CONTACTS_MAIRIE`, `ANCIENS_ADMINS`, `COMMENTAIRES_DOSSIER`, `PIECES_JOINTES` | Données statiques, pas de mutation |
+| Constants | `MAIRIE`, `UTILISATEUR_COURANT` | Single source démo (Proxy pour UTILISATEUR_COURANT) |
+| Helpers démo | `resetMockData`, `setCurrentUser`, `getCurrentUser` | Pas vocation à être hookés |
+| Config invariante | `const DIRECTION = PERSONNES.find(p => p.role === 'direction')` au top-level dans les 6 écrans `direction/*` | Identification de la direction pour configurer l'écran avant le render. Invariant pendant la session. |
+| Mode démo | `app/index.tsx` (PERSONNES + setCurrentUser), `app/auth/callback-demo.tsx` (PERSONNES) | Sélecteur de personnage initial |
+| Helper find | `app/mairie/reply.tsx` (`PERSONNES.find(role === 'mairie_admin')`) | Identification de l'agent qui répond |
+
+**0 import direct à dette technique restant.** Tous ceux qui restent sont architecturalement corrects.
+
+### Vérifications
+- ✅ `npm run typecheck` : exit 0
+- ✅ `npm run lint:fix` puis `lint` : 0 warning
+- ✅ `npm run bundle:check` : 4.39 MB JS, 20 kB CSS, OK
+
+### Bilan migration mockData → hooks
+- **Total écrans avec mockData mutable migrés** sur cette session : 7 (étape 15.C + 15.D)
+- **Total écrans utilisant hooks** : ~15 sur les 27 actifs
+- **Pattern établi** : tout nouveau dossier/personne/RDV/message créé via mutation propage automatiquement sur tous les écrans grâce à `queryClient.invalidateQueries()`
+
+### Commit local (à pousser)
+```
+refactor(data): migration mockData → hooks finalisee
+
+- mairie/mode-elu, mairie/stats, parent/passage-annee, mairie/dossier-detail
+  migres vers useDossiers/useEcoles/useRendezVous/usePersonnes.
+- Tous les imports mockData restants sont legitimes (enums referentiels,
+  constants config demo, helpers reset/getCurrentUser, identifiants top-
+  level pour la config invariante des ecrans direction).
+- passage-annee : useEffect pour synchroniser l'etat local members avec
+  la liste serveur, en preservant les decisions keep de l'utilisateur.
+
+TypeScript clean, lint clean, bundle web 4.39 MB OK.
+```
+
+---
+
 ## 2026-05-21 — Étape 15.A : Commit annuaire éditable côté direction + équipe mairie
 
 ### Fichiers modifiés

@@ -13,11 +13,17 @@ import {
 import { Badge } from '../../components/Badge';
 import { BottomNav } from '../../components/BottomNav';
 import { Card } from '../../components/Card';
-import { DOSSIERS, ECOLES, RENDEZ_VOUS } from '../../data/mockData';
+import { useDossiers, useEcoles, useRendezVous } from '../../hooks';
 
 export default function ModeEluScreen() {
   const insets = useSafeAreaInsets();
-  const urgentCount = DOSSIERS.filter((dossier) => dossier.urgence === 'elevee').length + 2;
+  // Vue stratégique élu : agrégats sur les dossiers/écoles/RDV via hooks pour
+  // bénéficier du cache partagé avec les autres écrans mairie.
+  const { data: dossiers = [] } = useDossiers();
+  const { data: ecoles = [] } = useEcoles();
+  const { data: rdvs = [] } = useRendezVous();
+  // +2 pour la démo : on simule des dossiers historiques non listés.
+  const urgentCount = dossiers.filter((dossier) => dossier.urgence === 'elevee').length + 2;
 
   return (
     <View className="flex-1 bg-slate-50">
@@ -41,7 +47,7 @@ export default function ModeEluScreen() {
 
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 140 }}>
         <View className="flex-row gap-2 mb-3">
-          <Kpi icon={<School color="#2563eb" size={16} />} label="Écoles" value={ECOLES.length} />
+          <Kpi icon={<School color="#2563eb" size={16} />} label="Écoles" value={ecoles.length} />
           <Kpi
             icon={<AlertTriangle color="#ef4444" size={16} />}
             label="Alertes"
@@ -97,7 +103,7 @@ export default function ModeEluScreen() {
               Prochains rendez-vous
             </Text>
           </View>
-          {RENDEZ_VOUS.map((rdv) => (
+          {rdvs.map((rdv) => (
             <View key={rdv.id} className="p-3 bg-slate-50 rounded-xl mb-2">
               <Text className="text-slate-700 text-sm font-semibold">{rdv.titre}</Text>
               <Text className="text-slate-400 text-xs mt-0.5">

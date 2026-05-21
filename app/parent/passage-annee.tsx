@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
 import {
   Archive,
@@ -15,25 +15,48 @@ import { BottomNav } from '../../components/BottomNav';
 import { Card } from '../../components/Card';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { SecondaryButton } from '../../components/SecondaryButton';
-import { DOSSIERS, PERSONNES } from '../../data/mockData';
+import { useDossiers, usePersonnes } from '../../hooks';
 
-const baseRepresentants = PERSONNES.filter(
-  (personne) => personne.role === 'parent_admin' || personne.role === 'parent_contributeur',
-).map((personne, index) => ({
-  id: personne.id,
-  name: `${personne.prenom} ${personne.nom}`,
-  role: personne.role === 'parent_admin' ? 'Admin' : 'Contributeur',
-  assoc: personne.association ?? 'Indépendants',
-  keep: index === 0,
-}));
+interface MemberRow {
+  id: string;
+  name: string;
+  role: 'Admin' | 'Contributeur';
+  assoc: string;
+  keep: boolean;
+}
 
 function nextKey() {
   return `JAURES-2027-${Math.floor(100 + Math.random() * 900)}`;
 }
 
 export default function PassageAnneeScreen() {
-  const [members, setMembers] = useState(baseRepresentants);
+  // Représentants via hook : reflète les invitations / ajouts faits en démo.
+  const { data: representants = [] } = usePersonnes({ representantsOnly: true });
+  const { data: dossiers = [] } = useDossiers();
+
+  const [members, setMembers] = useState<MemberRow[]>([]);
   const [rentreeKey, setRentreeKey] = useState(nextKey());
+
+  // Synchronise l'état local avec la liste serveur : on ajoute les nouveaux
+  // membres en gardant la décision (keep) de ceux déjà connus.
+  useEffect(() => {
+    setMembers((current) => {
+      const previousById = new Map(current.map((m) => [m.id, m]));
+      return representants.map((personne, index) => {
+        const previous = previousById.get(personne.id);
+        return (
+          previous ?? {
+            id: personne.id,
+            name: `${personne.prenom} ${personne.nom}`,
+            role: personne.role === 'parent_admin' ? 'Admin' : 'Contributeur',
+            assoc: personne.association ?? 'Indépendants',
+            // Par défaut : on garde le 1er (admin principal) et on archive les autres.
+            keep: index === 0,
+          }
+        );
+      });
+    });
+  }, [representants]);
 
   const toggleKeep = (id: string) => {
     setMembers((current) =>
@@ -90,18 +113,20 @@ export default function PassageAnneeScreen() {
             </Text>
           </View>
           <View className="gap-2">
-            {DOSSIERS.filter((dossier) => dossier.statut !== 'resolu').map((dossier) => (
-              <View
-                key={dossier.id}
-                className="flex-row items-center gap-2 p-3 bg-primary-50 rounded-xl"
-              >
-                <CheckCircle2 color="#2563eb" size={15} />
-                <Text className="text-slate-700 text-sm flex-1" numberOfLines={1}>
-                  {dossier.titre}
-                </Text>
-                <Badge label="Transféré" tone="primary" />
-              </View>
-            ))}
+            {dossiers
+              .filter((dossier) => dossier.statut !== 'resolu')
+              .map((dossier) => (
+                <View
+                  key={dossier.id}
+                  className="flex-row items-center gap-2 p-3 bg-primary-50 rounded-xl"
+                >
+                  <CheckCircle2 color="#2563eb" size={15} />
+                  <Text className="text-slate-700 text-sm flex-1" numberOfLines={1}>
+                    {dossier.titre}
+                  </Text>
+                  <Badge label="Transféré" tone="primary" />
+                </View>
+              ))}
           </View>
           <Text className="text-slate-400 text-xs leading-relaxed mt-3">
             Les dossiers résolus restent consultables dans l'historique, les dossiers ouverts
