@@ -1,8 +1,8 @@
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
-import type { ReactNode } from 'react';
+import { router, type Href } from 'expo-router';
+import { useState, type ReactNode } from 'react';
 import {
   AlertTriangle,
   Building2,
@@ -11,24 +11,32 @@ import {
   Home,
   Mail,
   School,
+  Sparkles,
+  UserCog,
   Users,
 } from 'lucide-react-native';
 import { GRADIENTS } from '../../constants/theme';
 import { BottomNav } from '../../components/BottomNav';
 import { Card } from '../../components/Card';
+import { DemoPersonneSelector } from '../../components/DemoPersonneSelector';
 import { DossierCard } from '../../components/DossierCard';
 import { AppointmentCard } from '../../components/AppointmentCard';
 import { ErrorBanner } from '../../components/ErrorBanner';
 import { LoadingState } from '../../components/LoadingState';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { MAIRIE } from '../../data/mockData';
-import { useDossiers, useRendezVous, useStatsMairie } from '../../hooks';
+import { useDossiers, usePersonnes, useRendezVous, useStatsMairie } from '../../hooks';
+import { USE_SUPABASE } from '../../services/_config';
 
 export default function MairieDashboardScreen() {
   const insets = useSafeAreaInsets();
   const { data: stats, isLoading: statsLoading, error: statsError } = useStatsMairie(MAIRIE.id);
   const { data: dossiers = [], error: dossiersError } = useDossiers();
   const { data: rdvs = [], error: rdvsError } = useRendezVous();
+  // Équipe interne mairie : agents service éducation + élus adjoints
+  const { data: personnes = [] } = usePersonnes();
+  const equipeCount = personnes.filter((p) => p.role === 'mairie_admin' || p.role === 'elu').length;
+  const [demoOpen, setDemoOpen] = useState(false);
   const aggregateError = statsError || dossiersError || rdvsError;
 
   if (statsLoading && !stats) {
@@ -178,6 +186,27 @@ export default function MairieDashboardScreen() {
           </View>
         </Pressable>
 
+        {/* Mon équipe — annuaire interne mairie (agents + élus), éditable en démo.
+            `as Href` car la route a été ajoutée après la dernière régénération
+            des typed routes — sera typée automatiquement au prochain `expo start`. */}
+        <Pressable
+          onPress={() => router.push('/mairie/equipe' as Href)}
+          className="bg-white rounded-2xl p-4 border border-slate-100 mt-3 flex-row items-center gap-3"
+          style={({ pressed }) => ({ opacity: pressed ? 0.86 : 1 })}
+        >
+          <View className="w-10 h-10 bg-mairie-50 rounded-xl items-center justify-center">
+            <UserCog color="#0d9488" size={20} />
+          </View>
+          <View className="flex-1">
+            <Text className="text-slate-800 font-bold text-sm">
+              Mon équipe ({equipeCount} {equipeCount > 1 ? 'membres' : 'membre'})
+            </Text>
+            <Text className="text-slate-500 text-xs mt-0.5">
+              Agents du service éducation et élus du cabinet adjoint.
+            </Text>
+          </View>
+        </Pressable>
+
         <Text className="text-slate-700 font-bold text-sm mb-3 mt-5">Derniers dossiers</Text>
         {dossiers.slice(0, 3).map((d) => (
           <DossierCard
@@ -199,8 +228,26 @@ export default function MairieDashboardScreen() {
             onPress={() => router.push('/mairie/messages')}
           />
         </View>
+
+        {/* Raccourci mode démo : accessible depuis tous les rôles (sans devoir
+            switcher vers parent pour accéder au profil). Visible uniquement
+            quand on tourne en mock. */}
+        {!USE_SUPABASE && (
+          <Pressable
+            onPress={() => setDemoOpen(true)}
+            className="mt-3 flex-row items-center justify-center gap-2 py-3 rounded-xl bg-accent-50 border border-accent-100"
+            style={({ pressed }) => ({ opacity: pressed ? 0.85 : 1 })}
+          >
+            <Sparkles color="#d97706" size={14} />
+            <Text className="text-accent-500 text-xs font-bold">
+              Mode démo · changer de rôle ou réinitialiser
+            </Text>
+          </Pressable>
+        )}
       </ScrollView>
       <BottomNav variant="mairie" />
+
+      <DemoPersonneSelector visible={demoOpen} onClose={() => setDemoOpen(false)} />
     </View>
   );
 }

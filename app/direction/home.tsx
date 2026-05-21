@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,13 +11,16 @@ import {
   MessageSquare,
   Plus,
   ShieldCheck,
+  Sparkles,
 } from 'lucide-react-native';
 import { GRADIENTS } from '../../constants/theme';
 import { BottomNav } from '../../components/BottomNav';
 import { Badge } from '../../components/Badge';
+import { DemoPersonneSelector } from '../../components/DemoPersonneSelector';
 import { ErrorBanner } from '../../components/ErrorBanner';
 import { ECOLES, PERSONNES } from '../../data/mockData';
 import { useDossiers, useMessages, useRendezVous } from '../../hooks';
+import { USE_SUPABASE } from '../../services/_config';
 
 const DIRECTION = PERSONNES.find((p) => p.role === 'direction');
 const ECOLE_DIRECTION = ECOLES.find((e) => e.id === DIRECTION?.ecoleId) ?? ECOLES[0];
@@ -54,6 +58,7 @@ export default function DirectionHomeScreen() {
       : false,
   );
   const prochainRdv = rdvsDirection.find((r) => r.statut === 'confirme') ?? rdvsDirection[0];
+  const [demoOpen, setDemoOpen] = useState(false);
 
   return (
     <View className="flex-1 bg-slate-50">
@@ -203,6 +208,21 @@ export default function DirectionHomeScreen() {
           </View>
         )}
 
+        {/* Raccourci mode démo : accessible depuis tous les rôles. Visible
+            uniquement quand on tourne en mock. */}
+        {!USE_SUPABASE && (
+          <Pressable
+            onPress={() => setDemoOpen(true)}
+            className="flex-row items-center justify-center gap-2 py-3 rounded-xl bg-accent-50 border border-accent-100 mb-3"
+            style={({ pressed }) => ({ opacity: pressed ? 0.85 : 1 })}
+          >
+            <Sparkles color="#d97706" size={14} />
+            <Text className="text-accent-500 text-xs font-bold">
+              Mode démo · changer de rôle ou réinitialiser
+            </Text>
+          </Pressable>
+        )}
+
         {/* Prochain RDV */}
         {prochainRdv && (
           <View className="bg-white rounded-2xl p-4 mb-3 border border-slate-100">
@@ -264,6 +284,8 @@ export default function DirectionHomeScreen() {
       </Pressable>
 
       <BottomNav variant="direction" />
+
+      <DemoPersonneSelector visible={demoOpen} onClose={() => setDemoOpen(false)} />
     </View>
   );
 }

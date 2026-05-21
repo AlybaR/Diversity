@@ -91,13 +91,29 @@ export const TOUR_STEPS: TourStep[] = [
     navigateTo: '/mairie/dossiers',
   },
   {
+    id: 'mairie-equipe',
+    title: "L'annuaire interne mairie",
+    description:
+      'Ici tu vois les agents du service éducation et les élus du cabinet. En mode démo, tu peux ajouter un agent ou un élu en direct — il apparaît immédiatement dans le sélecteur de mode démo et dans les listes filtrées par rôle.',
+    nextLabel: 'Voir la direction',
+    navigateTo: '/mairie/equipe',
+  },
+  {
     id: 'direction-home',
     title: 'Côté direction d’école',
     description:
       'Enfin, voici la vue de la directrice. Elle ne voit que les sujets institutionnels (canal direction↔mairie ou tripartite) — jamais les conversations privées parents↔mairie.',
-    nextLabel: 'Suivant',
+    nextLabel: 'Annuaire pédagogique',
     navigateTo: '/direction/home',
     switchToRole: 'direction',
+  },
+  {
+    id: 'direction-directory',
+    title: "L'équipe pédagogique",
+    description:
+      "Dernier point : la direction gère aussi son équipe pédagogique (enseignants impliqués sur les dossiers). L'annuaire est également éditable en démo pour ajouter un enseignant en direct.",
+    nextLabel: 'Suivant',
+    navigateTo: '/direction/directory',
   },
   {
     id: 'done',

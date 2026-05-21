@@ -1,18 +1,24 @@
 /**
- * <DemoPersonneSelector /> — sheet modal qui liste les 5 personnes mock pour
+ * <DemoPersonneSelector /> — sheet modal qui liste les 5+ personnes mock pour
  * la démo. Tap = bascule l'identité courante + redirige vers la home du rôle.
  *
  * Affiché uniquement en mode démo (USE_SUPABASE=false) :
  *   - depuis le Welcome via un bouton "Mode démo"
  *   - depuis le profil parent (section "Mode démo")
+ *   - depuis le dashboard mairie et la home direction (action "Mode démo")
+ *
+ * Inclut également un bouton "Réinitialiser la démo" pour repartir d'un état
+ * propre entre deux présentations, sans avoir à switcher de rôle pour accéder
+ * au profil parent.
  *
  * Pas de useSession ici — on bypass tout, le user "se connecte" instantanément
  * en se choisissant un personnage.
  */
 
-import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
-import { Sparkles, X } from 'lucide-react-native';
-import { ECOLES, PERSONNES } from '../data/mockData';
+import { Alert, Modal, Pressable, ScrollView, Text, View } from 'react-native';
+import { RefreshCw, Sparkles, X } from 'lucide-react-native';
+import { useQueryClient } from '@tanstack/react-query';
+import { ECOLES, PERSONNES, resetMockData } from '../data/mockData';
 import { useDemoUser } from '../hooks/useDemoUser';
 import type { Personne, Role } from '../types';
 import { COLORS } from '../constants/theme';
@@ -88,11 +94,35 @@ export function DemoPersonneSelector({
   description = 'Sélectionne une personne pour explorer son point de vue. Tu peux changer à tout moment depuis ton profil.',
 }: DemoPersonneSelectorProps) {
   const { currentUser, switchTo } = useDemoUser();
+  const queryClient = useQueryClient();
+
+  const handleReset = () => {
+    Alert.alert(
+      'Réinitialiser la démo ?',
+      "Toutes les données créées pendant cette session (dossiers, messages, RDV, personnes ajoutées) vont être restaurées à l'état initial. L'utilisateur courant reste inchangé.",
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Réinitialiser',
+          style: 'destructive',
+          onPress: () => {
+            resetMockData();
+            queryClient.invalidateQueries();
+            onClose();
+            Alert.alert(
+              'Démo réinitialisée',
+              "Les listes sont restaurées à l'état d'origine. Tu peux relancer ta présentation depuis un état propre.",
+            );
+          },
+        },
+      ],
+    );
+  };
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View className="flex-1 justify-end bg-slate-950/40">
-        <View className="bg-white rounded-t-3xl p-5 max-h-[80%]">
+        <View className="bg-white rounded-t-3xl p-5 max-h-[88%]">
           <View className="flex-row items-start justify-between gap-3 mb-3">
             <View className="flex-1">
               <View className="flex-row items-center gap-2 mb-1">
@@ -123,6 +153,25 @@ export function DemoPersonneSelector({
               />
             ))}
           </ScrollView>
+
+          {/* Reset démo : accessible depuis tous les rôles via ce sheet, sans
+              passer par /parent/profile. Sépare visuellement du picker via une
+              fine bordure. */}
+          <View className="mt-3 pt-3 border-t border-slate-100">
+            <Pressable
+              onPress={handleReset}
+              className="flex-row items-center gap-2 p-3 rounded-xl bg-warning-50 border border-warning-100"
+              style={({ pressed }) => ({ opacity: pressed ? 0.85 : 1 })}
+            >
+              <RefreshCw color={COLORS.warning[600]} size={16} />
+              <View className="flex-1">
+                <Text className="text-slate-800 font-bold text-xs">Réinitialiser la démo</Text>
+                <Text className="text-slate-500 text-[10px] mt-0.5">
+                  Restaurer dossiers, messages, RDV et personnes à l’état initial.
+                </Text>
+              </View>
+            </Pressable>
+          </View>
 
           <Text className="text-slate-400 text-[10px] text-center mt-3 leading-relaxed">
             En production, la liste des utilisateurs sera gérée par la mairie via des invitations

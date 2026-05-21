@@ -1441,6 +1441,78 @@ Entre l'Étape 14 et cette reprise, l'utilisateur a travaillé sur d'autres serv
 
 ---
 
+## 2026-05-21 — Étape 15.B : Démo renforcée (navigation équipe, tour étendu, reset universel)
+
+### Objectif (suite de l'Étape 15)
+Combler les 3 gaps identifiés dans l'audit démo :
+1. `/mairie/equipe` créé mais inaccessible (ni BottomNav ni dashboard)
+2. Visite guidée ne montrait pas l'annuaire éditable
+3. Reset démo uniquement dans `/parent/profile` (un agent mairie devait switcher pour reset)
+
+### 15.B.1 — Lien vers `/mairie/equipe` depuis le dashboard mairie
+**Fichier modifié :** `app/mairie/dashboard.tsx`
+- Ajout d'un hook `usePersonnes()` + compteur `equipeCount` (agents + élus)
+- Nouvelle carte « Mon équipe (X membres) » entre RDV et « Derniers dossiers », pleine largeur, icône `UserCog` teal
+- Navigation vers `/mairie/equipe` au tap
+- Cast `as Href` (route ajoutée après dernière régénération typed routes → sera typée auto au prochain `expo start`)
+
+### 15.B.2 — Visite guidée étendue
+**Fichier modifié :** `hooks/useGuidedTour.ts`
+- 2 nouvelles étapes ajoutées (7 → 9) :
+  - `mairie-equipe` (après `mairie-dossiers`) : montre l'annuaire interne mairie éditable
+  - `direction-directory` (après `direction-home`) : montre l'équipe pédagogique éditable
+- Le `nextLabel` de `mairie-dossiers` reste "Suivant", celui de `mairie-equipe` est "Voir la direction"
+- Le `nextLabel` de `direction-home` passe à "Annuaire pédagogique"
+- Couvre maintenant les 3 hubs ET la fonctionnalité éditable distinctive de la démo
+
+### 15.B.3 — Reset démo universel via `DemoPersonneSelector`
+**Fichiers modifiés :**
+- `components/DemoPersonneSelector.tsx` : ajout d'un bouton « Réinitialiser la démo » en bas du sheet, séparé par une bordure. Alert de confirmation, puis `resetMockData()` + `queryClient.invalidateQueries()` + fermeture du sheet + Alert de confirmation. Réutilise exactement la logique de `/parent/profile`.
+- `app/mairie/dashboard.tsx` : raccourci « Mode démo · changer de rôle ou réinitialiser » en bas de la ScrollView, visible uniquement si `!USE_SUPABASE`. Ouvre le sheet.
+- `app/direction/home.tsx` : même raccourci, même bouton, en bas de la ScrollView avant le RDV.
+
+**Bénéfice** : un agent mairie ou une direction peut maintenant **reset la démo sans avoir à switcher d'abord vers parent**. Cohérent avec l'idée que le mode démo doit être accessible partout.
+
+### Décisions techniques
+- **Pas d'onglet Équipe dans la BottomNav mairie** : 4 onglets déjà denses (Dashboard, Écoles, Messages, RDV). Une carte sur le dashboard suffit et reste visible dès l'entrée mairie.
+- **`resetMockData()` reste l'unique fonction de reset** : on factorise la logique dans le sheet `DemoPersonneSelector` plutôt que de dupliquer dans chaque écran (1 endroit, plusieurs entrées).
+- **`as Href`** pour `/mairie/equipe` : workaround temporaire car la sandbox n'a pas relancé `expo start` pour régénérer `.expo/types/router.d.ts`. Sera transparent après prochain lancement local.
+
+### Fichiers créés
+(aucun nouveau fichier)
+
+### Fichiers modifiés
+- `app/mairie/dashboard.tsx` (+ ~30 lignes)
+- `app/direction/home.tsx` (+ ~18 lignes)
+- `hooks/useGuidedTour.ts` (+ 14 lignes : 2 étapes)
+- `components/DemoPersonneSelector.tsx` (+ ~35 lignes : section reset)
+- `CHANGELOG_MOBILE.md` (cette entrée)
+
+### Vérifications
+- ✅ `npm run typecheck` : exit 0
+- ✅ `npm run lint` : 0 warning (après auto-fix de 2 warnings Prettier)
+- ✅ `npm run bundle:check` : bundle web exporté sans erreur
+
+### À pousser sur GitHub
+Commit suggéré (à faire après le commit de l'Étape 15.A si pas encore poussé) :
+```
+feat(demo): navigation equipe + tour etendu + reset universel
+
+- /mairie/dashboard : carte "Mon equipe" pointant vers /mairie/equipe
+  (annuaire interne) avec compteur dynamique d'agents + elus
+- useGuidedTour : 2 nouvelles etapes (mairie-equipe, direction-directory)
+  pour couvrir les annuaires editables des 2 nouveaux ecrans
+- DemoPersonneSelector : bouton "Reinitialiser la demo" integre au sheet,
+  utilise resetMockData + invalidateQueries
+- /mairie/dashboard et /direction/home : raccourci "Mode demo" pour
+  ouvrir le sheet sans devoir switcher vers parent au prealable
+
+Le mode demo est maintenant ergonomiquement accessible depuis les 3
+roles (parent profile, mairie dashboard, direction home).
+```
+
+---
+
 ## 2026-05-21 — Étape 15.A : Commit annuaire éditable côté direction + équipe mairie
 
 ### Fichiers modifiés
