@@ -1389,7 +1389,80 @@ Suite à l'ajout de la section « Performance ce mois » (étape 14), la grille 
 
 ---
 
-## 2026-05-19 — Bilan final
+## 2026-05-21 — Étape 15 : Reprise après progression hors-journal (phases 0-4 GitHub + démo)
+
+### Contexte
+Entre l'Étape 14 et cette reprise, l'utilisateur a travaillé sur d'autres serveurs et a fait progresser le projet de plusieurs phases sans nécessairement les consigner dans ce CHANGELOG. L'historique réel est dans `git log`. Cette entrée capture l'état au moment de la reprise pour repartir sur une base nette.
+
+### Travaux accomplis entre-temps (résumé depuis `git log` et l'audit complet)
+- **Phase 0** — CI GitHub Actions + templates PR/Issues + CONTRIBUTING
+- **Phase 1.1+** — Intégration Supabase complète :
+  - `@supabase/supabase-js@^2.106.0`, `@tanstack/react-query@^5.100.11`
+  - `lib/supabase.ts` (client avec AsyncStorage natif + localStorage web)
+  - 4 migrations SQL (`0001_initial_schema`, `0002_rls_policies`, `0003_auth_link_rpc`, `0004_personnes_push_token`)
+  - 7 mappers Supabase dans `services/supabase/`
+  - Feature flag `EXPO_PUBLIC_USE_SUPABASE` (actuellement `false` → mode mock)
+- **Phase 2** — Authentification magic link :
+  - `app/sign-in/`, `app/auth/callback.tsx`, `app/auth/debug.tsx`, `app/auth/no-access.tsx`
+  - `hooks/useSession.ts`, `components/AuthGuard.tsx`
+- **Phase 3** — Robustesse production :
+  - `components/EmptyState.tsx`, `ErrorBanner.tsx`, `LoadingState.tsx`, `OfflineBanner.tsx`
+  - `hooks/useNetworkStatus.ts`, `lib/sentry.ts` (stub), `lib/notifications.ts`
+- **Phase 4** — Légal & RGPD :
+  - `app/legal/cgu.tsx`, `privacy.tsx`, `mentions.tsx`
+  - `app/aide/comment-ca-marche.tsx`, `faq.tsx`, `contact.tsx`
+- **Modélisation enrichie** (types) :
+  - `VisibilityScope` (`parents_mairie` | `direction_mairie` | `partage_tripartite` | `mairie_interne`)
+  - `canRoleSeeScope(role, scope)` — matrice d'accès rôle × scope
+  - `scopeShortLabel(scope)` — labels UI
+  - `ContactMairie`, `AncienAdmin`, `PieceJointe`, `CommentaireDossier`
+- **Hub direction d'école** complet (`app/direction/*`, 9 écrans)
+- **Visite guidée par bulles** (6 étapes, `hooks/useGuidedTour.ts`, `components/TourBubble.tsx`, `TourStartCta.tsx`)
+- **QR code partage démo** (`components/DemoQrCode.tsx`)
+- **Sélecteur d'utilisateur démo** (`components/DemoPersonneSelector.tsx`)
+- **Mode démo 3 jours** : annuaire parents éditable (`useCreatePersonne` mutation), bouton réinitialiser la démo
+
+### État au début de cette reprise
+- Branche `feat/demo-3-jours` synchronisée avec `origin`
+- **2 fichiers non commités** prolongeant la dernière feature « annuaire éditable » :
+  - `app/direction/directory.tsx` modifié (ajoute section « Mon équipe pédagogique » éditable avec modal)
+  - `app/mairie/equipe.tsx` nouveau (annuaire interne mairie : agents service éducation + élus adjoint, avec modal d'ajout)
+- Pattern identique : `usePersonnes` + `useCreatePersonne` mutation + `Modal` de saisie
+- 27 écrans actifs, 29 composants, 12 hooks, 8 services
+- TypeScript clean, lint clean, bundle 4.39 MB JS + 20 kB CSS
+
+### Choix utilisateur pour cette reprise
+« Continuer la démo (annuaire poussé + reset) » — pas d'activation Supabase, pas de tests.
+
+### Plan de cette reprise
+- **Phase A** : commit du WIP en cours (2 fichiers) — en cours
+- **Phase B** : renforcer la démo (navigation vers `/mairie/equipe`, visite guidée étendue, reset démo plus complet)
+- **Phase C** : push final + bilan
+
+---
+
+## 2026-05-21 — Étape 15.A : Commit annuaire éditable côté direction + équipe mairie
+
+### Fichiers modifiés
+- `app/direction/directory.tsx` (+229 lignes) : ajout d'une 2e section « Mon équipe pédagogique » avec modal d'ajout d'enseignant. Reprend le pattern de l'annuaire parents éditable. Utilise `useCreatePersonne({ role: 'direction', ecoleId: ECOLE_DIRECTION.id })`.
+
+### Fichiers créés
+- `app/mairie/equipe.tsx` (242 lignes) : annuaire interne mairie. Liste les `mairie_admin` (agents service éducation) et `elu` (cabinet adjoint). Modal d'ajout avec choix du type de poste via `SelectField<MairieRole>`. Header gradient mairie (teal).
+
+### Vérifications
+- ✅ `npm run typecheck` : exit 0
+- ✅ `npm run lint:fix` puis `npm run lint` : 0 erreur, 0 warning (5 warnings Prettier auto-fixés sur les 2 fichiers)
+- ✅ `npm run bundle:check` : JS 4.39 MB, CSS 20 kB, OK
+- ✅ Pattern cohérent avec l'annuaire parents éditable précédent
+
+### Commit
+- Message style : `feat(demo): annuaire editable cote direction + ecran equipe mairie`
+- Branche : `feat/demo-3-jours`
+- Push : à effectuer
+
+---
+
+## 2026-05-19 — Bilan final (étape précédente, conservé pour traçabilité)
 
 ### Statistiques finales
 
