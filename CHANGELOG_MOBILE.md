@@ -5,6 +5,108 @@ Le projet web `mockups-app/` n'est jamais modifié.
 
 ---
 
+## 2026-05-21 — Étape 20 : Phase 4 — Légal & contenu (CGU, RGPD, mentions, aide, profil parent)
+
+### Contexte
+
+Phase 3 vient d'être poussée. En parallèle des PRs Phase 1/2/3 que l'utilisateur peut merger quand il veut, on attaque Phase 4 (Légal & contenu) pour préparer le service à la mise en production publique. C'est ce qui débloque les pilotes (Phase 5) côté légal/RGPD.
+
+But : avoir des pages CGU, politique de confidentialité, mentions légales rédigées (en attente de validation juriste avant prod publique), un centre d'aide accessible, et une page profil avec section RGPD fonctionnelle (export, suppression).
+
+### Écrans `/aide/*` (4 nouveaux)
+
+| Route | Contenu |
+| --- | --- |
+| `/aide` | Menu d'aide qui pointe vers les 3 sous-pages |
+| `/aide/comment-ca-marche` | Présentation Passerelle : les 3 rôles, les 4 canaux, le workflow type, la promesse RLS |
+| `/aide/faq` | 15 questions / réponses en accordéon, 4 sections (Général, Sécurité & RGPD, Compte, Technique) |
+| `/aide/contact` | Email support + DPO + formulaire de contact (envoi logué Sentry, pipeline réelle = Phase 5) |
+
+### Écrans `/legal/*` (4 nouveaux)
+
+| Route | Contenu |
+| --- | --- |
+| `/legal` | Menu légal qui pointe vers les 3 sous-pages |
+| `/legal/mentions` | Mentions légales conformes LCEN art. 6.III. Champs `[À COMPLÉTER]` pour identité éditeur. |
+| `/legal/cgu` | CGU adaptées Passerelle, 13 articles standards (objet, définitions, acceptation, accès, compte, engagements user/éditeur, propriété intellectuelle, données, suspension, responsabilité, modifications, loi applicable). Avertissement « document préparatoire » en bas. |
+| `/legal/privacy` | Politique de confidentialité RGPD, structure CNIL recommandée (12 sections). Responsable de traitement, données collectées par catégorie (identité, contenu, métadonnées, push token), finalités, bases légales, destinataires, durées, droits utilisateur, DPO, sécurité, transferts hors UE (aucun pour les données nominatives), cookies, réclamation CNIL. |
+
+Wording adopté : tutoiement (cohérent avec le ton de l'app). Pas de cookies tiers, pas de tracking publicitaire — engagement fort différenciant.
+
+### Profil parent réécrit (était un BlueprintRoute placeholder)
+
+`app/parent/profile.tsx` — vraie page maintenant :
+
+- **Header dégradé** avec initiales, nom, fonction, école
+- **Section Identité** : email + mairie de rattachement
+- **Section Préférences** : lien vers notifications-settings
+- **Section RGPD** :
+  - Export des données (déclenche une demande, captureMessage Sentry, pipeline ZIP = Phase 5)
+  - Lien vers `/legal/privacy`
+  - Suppression compte avec modal de double confirmation (taper exactement « supprimer ») → signOut + redirect en mode Supabase, demande enregistrée seulement en mode mock
+- **Section Aide & Légal** : liens vers `/aide`, `/legal/cgu`, `/legal/mentions`
+- **Bouton Se déconnecter** + FAB sortie discret
+
+Source de vérité : `useSession().personne` en mode Supabase, fallback `UTILISATEUR_COURANT` en mode mock. Préserve la compatibilité E2E tests.
+
+### Wiring navigation
+
+- `app/_layout.tsx` : déclaration `<Stack.Screen name="aide" />` et `<Stack.Screen name="legal" />`
+- `app/index.tsx` (Welcome) : les liens footer « Découvrir l'application » et « Besoin d'aide ? » deviennent cliquables (Pressable → `/aide/comment-ca-marche` et `/aide`). Nouvelle ligne en bas : `Mentions légales · CGU · Confidentialité` (texte semi-transparent, discret).
+
+### Documentation
+
+**`LEGAL_NOTES.md`** (nouveau) — registre interne des décisions juridiques en attente :
+
+- Identité éditeur (forme juridique, raison sociale, SIRET, adresse) à compléter
+- Désignation DPO interne vs externe
+- Validations juriste à faire sur CGU et privacy avant prod publique
+- Dépôt INPI de la marque « Passerelle » à finaliser
+- Choix de rédaction faits (tutoiement, conservation 3 ans, suppression différée 30j) avec arguments
+- Process de mise à jour des pages légales
+
+### Fichiers créés
+
+| Fichier | Rôle |
+| --- | --- |
+| `app/aide/index.tsx` | Menu d'aide |
+| `app/aide/comment-ca-marche.tsx` | Présentation rôles + canaux + workflow |
+| `app/aide/faq.tsx` | 15 Q/R accordéon |
+| `app/aide/contact.tsx` | Email support + DPO + formulaire |
+| `app/legal/index.tsx` | Menu légal |
+| `app/legal/mentions.tsx` | Mentions légales LCEN |
+| `app/legal/cgu.tsx` | Conditions générales d'utilisation |
+| `app/legal/privacy.tsx` | Politique de confidentialité RGPD |
+| `LEGAL_NOTES.md` | Registre interne des décisions juridiques |
+
+### Fichiers modifiés
+
+- `app/_layout.tsx` : déclaration des routes `aide` et `legal`
+- `app/index.tsx` (Welcome) : liens footer cliquables + ligne mentions
+- `app/parent/profile.tsx` : remplacement complet du BlueprintRoute par une vraie page profil avec section RGPD
+
+### Vérifications
+
+- ✅ `npm run typecheck` (tsc --noEmit) exit 0
+- ✅ `npm run lint` exit 0 (0 erreur, 0 warning après lint:fix)
+- ⏳ `npm run bundle:check` à lancer avant commit final
+- ⏳ E2E Playwright à relancer côté CI (mock mode — devraient passer, profil parent étend mais ne casse pas le parcours existant)
+
+### Limites volontaires (à traiter en Phase 4 partie 2 ou Phase 5)
+
+- **Profil mairie et direction** : pas créés. Le pattern est posé sur parent, à dupliquer.
+- **Export RGPD réel** : la pipeline ZIP (Edge Function Supabase qui assemble les données et envoie en pièce jointe) est en Phase 5.
+- **Suppression compte réelle** : actuellement signOut + redirect. La suppression différée 30 jours (marqueur DB + cron de purge) est en Phase 5.
+- **Identité éditeur** : champs `[À COMPLÉTER]` partout. À renseigner avant prod publique.
+
+### Pourquoi c'est utile maintenant
+
+- **Phase 5 (pilote mairies)** ne peut pas démarrer sans CGU + politique de confidentialité affichables. Maintenant c'est en place.
+- **Crédibilité institutionnelle** : un service éducation qui ouvre `/legal/privacy` doit voir un document conforme RGPD, pas un placeholder.
+- **Coût marginal de la suite** : avec le squelette posé, la révision juriste se résume à modifier des constantes (`SUPPORT_EMAIL`, `[À COMPLÉTER]`) — pas à tout réécrire.
+
+---
+
 ## 2026-05-20 — Étape 19 : Phase 3 — Robustesse production (UX d'état + Sentry + offline + push)
 
 ### Contexte

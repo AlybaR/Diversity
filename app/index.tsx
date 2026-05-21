@@ -244,14 +244,37 @@ export default function WelcomeScreen() {
 
           {/* Liens secondaires */}
           <View className="flex-row justify-center gap-6 pt-4 pb-2">
-            <View className="flex-row items-center gap-1">
+            <Pressable
+              onPress={() => router.push('/aide/comment-ca-marche' as Href)}
+              hitSlop={8}
+              className="flex-row items-center gap-1"
+            >
               <Sparkles size={12} color="rgba(255,255,255,0.6)" />
               <Text className="text-white/60 text-xs font-medium">Découvrir l'application</Text>
-            </View>
-            <View className="flex-row items-center gap-1">
+            </Pressable>
+            <Pressable
+              onPress={() => router.push('/aide' as Href)}
+              hitSlop={8}
+              className="flex-row items-center gap-1"
+            >
               <HelpCircle size={12} color="rgba(255,255,255,0.6)" />
               <Text className="text-white/60 text-xs font-medium">Besoin d'aide ?</Text>
-            </View>
+            </Pressable>
+          </View>
+
+          {/* Mentions légales en bas, discret */}
+          <View className="flex-row justify-center gap-3 pt-3">
+            <Pressable onPress={() => router.push('/legal/mentions' as Href)} hitSlop={6}>
+              <Text className="text-white/40 text-[10px]">Mentions légales</Text>
+            </Pressable>
+            <Text className="text-white/30 text-[10px]">·</Text>
+            <Pressable onPress={() => router.push('/legal/cgu' as Href)} hitSlop={6}>
+              <Text className="text-white/40 text-[10px]">CGU</Text>
+            </Pressable>
+            <Text className="text-white/30 text-[10px]">·</Text>
+            <Pressable onPress={() => router.push('/legal/privacy' as Href)} hitSlop={6}>
+              <Text className="text-white/40 text-[10px]">Confidentialité</Text>
+            </Pressable>
           </View>
         </View>
       </ScrollView>

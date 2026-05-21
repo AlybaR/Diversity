@@ -65,6 +65,8 @@ export default function RootLayout() {
                   <Stack.Screen name="parent" />
                   <Stack.Screen name="mairie" />
                   <Stack.Screen name="direction" />
+                  <Stack.Screen name="aide" />
+                  <Stack.Screen name="legal" />
                 </Stack>
               </View>
             </View>
