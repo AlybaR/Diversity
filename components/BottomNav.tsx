@@ -109,7 +109,7 @@ export function BottomNav({ variant = 'parent' }: BottomNavProps) {
       style={{ paddingBottom: Math.max(insets.bottom, 8), paddingTop: 8 }}
     >
       <View className="flex-row items-center justify-around">
-        {items.map((item) => {
+        {items.map((item, index) => {
           const pathStr = typeof item.path === 'string' ? item.path : '';
           const active =
             pathStr !== '' && (pathname === pathStr || pathname.startsWith(pathStr + '/'));
@@ -118,6 +118,9 @@ export function BottomNav({ variant = 'parent' }: BottomNavProps) {
             <Pressable
               key={pathStr}
               onPress={() => router.push(item.path)}
+              accessibilityRole="tab"
+              accessibilityLabel={`${item.label}, onglet ${index + 1} sur ${items.length}`}
+              accessibilityState={{ selected: active }}
               className="flex-1 items-center py-1"
               hitSlop={4}
             >

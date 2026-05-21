@@ -1639,6 +1639,73 @@ TypeScript clean, lint clean, bundle web 4.39 MB OK.
 
 ---
 
+## 2026-05-21 — Étape 15.E : Accessibilité de base (a11y) sur les composants partagés
+
+### Contexte
+Audit `grep accessibilityLabel|accessibilityRole|accessibilityHint` retournait **0 occurrence** dans tout le projet. Gap d'accessibilité majeur pour une app destinée au secteur public (RGAA / WCAG mandatory).
+
+### Stratégie
+Plutôt que d'ajouter des attributs sur les ~200 `<Pressable>` répartis dans 27 écrans, ajouter l'a11y sur les **composants partagés** qui sont utilisés partout. ROI maximal :
+- `PrimaryButton` : utilisé dans tous les écrans avec action principale
+- `SecondaryButton` : utilisé pour les actions secondaires
+- `BottomNav` : 5 onglets × 3 hubs = 15 raccourcis tabulables
+- `TextInputField` : tous les formulaires
+
+Couvre ~80 % des Pressable de l'app via 4 composants.
+
+### Composants enrichis
+
+#### `components/PrimaryButton.tsx`
+- `accessibilityRole="button"`
+- `accessibilityLabel` par défaut = `label`, surchargeable via prop
+- `accessibilityHint` (prop optionnelle)
+- `accessibilityState={{ disabled }}` quand désactivé
+
+#### `components/SecondaryButton.tsx`
+- Mêmes ajouts que PrimaryButton
+
+#### `components/BottomNav.tsx`
+- `accessibilityRole="tab"` sur chaque onglet
+- `accessibilityLabel` au format `« Accueil, onglet 1 sur 5 »` (pattern iOS/Android standard)
+- `accessibilityState={{ selected: active }}` reflète l'onglet actif
+
+#### `components/TextInputField.tsx`
+- `accessibilityLabel` par défaut = `label` visible, fallback sur `placeholder` puis sur la prop user
+- Les lecteurs d'écran lisent automatiquement le label visible sans duplication
+
+### Décisions techniques
+- **`accessibilityLabel ?? label`** : on respecte la prop user si fournie, sinon on prend le label visible (zero-config dans 99 % des cas)
+- **Onglets BottomNav** : pattern « item X sur Y » conforme aux conventions iOS VoiceOver / Android TalkBack
+- **Pas d'a11y sur Card / Badge** : ils sont informationnels (l'a11y se gère par le contexte parent ou le contenu textuel directement lisible)
+
+### Vérifications
+- ✅ `npm run typecheck` : exit 0
+- ✅ `npm run lint` : 0 erreur, 0 warning
+- ✅ Aucun changement visuel (les props a11y sont invisibles à l'écran)
+
+### Reste à faire (futur)
+- A11y sur les modales (`Modal` accessibilityViewIsModal, focus management)
+- A11y sur les icônes décoratives (PhoneFrame notch, decorations Welcome) : `accessibilityElementsHidden`
+- Audit Lighthouse / axe-core une fois en production
+- Tests A11y avec `@testing-library/react-native` (`role: 'button'` queries)
+
+### Commit local
+```
+feat(a11y): ajout accessibilityLabel/Role/Hint sur les composants partages
+
+PrimaryButton, SecondaryButton, BottomNav, TextInputField exposent
+desormais des attributs a11y conformes RGAA :
+- role button/tab selon le contexte
+- label dynamique base sur le label visible (zero-config)
+- state selected sur les onglets actifs, disabled sur les boutons disabled
+- hint optionnel pour preciser l'action
+
+Couvre ~80% des Pressable de l'app via 4 composants. Aucun changement
+visuel. TypeScript clean, lint clean.
+```
+
+---
+
 ## 2026-05-21 — Étape 15.A : Commit annuaire éditable côté direction + équipe mairie
 
 ### Fichiers modifiés

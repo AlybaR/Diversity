@@ -7,6 +7,10 @@ interface SecondaryButtonProps {
   iconLeft?: ReactNode;
   variant?: 'outline' | 'ghost' | 'slate';
   className?: string;
+  /** Texte lu par les lecteurs d'écran. Par défaut = `label`. */
+  accessibilityLabel?: string;
+  /** Hint additionnel pour préciser l'action déclenchée. */
+  accessibilityHint?: string;
 }
 
 export function SecondaryButton({
@@ -15,6 +19,8 @@ export function SecondaryButton({
   iconLeft,
   variant = 'outline',
   className = '',
+  accessibilityLabel,
+  accessibilityHint,
 }: SecondaryButtonProps) {
   const variantClasses =
     variant === 'outline'
@@ -28,6 +34,9 @@ export function SecondaryButton({
   return (
     <Pressable
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel ?? label}
+      accessibilityHint={accessibilityHint}
       style={({ pressed }) => ({ opacity: pressed ? 0.85 : 1 })}
       className={`${variantClasses} rounded-xl py-3.5 px-5 flex-row items-center justify-center gap-2 ${className}`}
     >

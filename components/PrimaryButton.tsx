@@ -10,6 +10,13 @@ interface PrimaryButtonProps {
   iconRight?: ReactNode;
   disabled?: boolean;
   className?: string;
+  /**
+   * Texte lu par les lecteurs d'écran. Par défaut = `label`. À surcharger
+   * quand le label visible est court mais ambigu (ex : "OK" sur une modale).
+   */
+  accessibilityLabel?: string;
+  /** Hint additionnel (ex : « ouvre la liste des dossiers »). */
+  accessibilityHint?: string;
 }
 
 export function PrimaryButton({
@@ -19,11 +26,17 @@ export function PrimaryButton({
   iconRight,
   disabled = false,
   className = '',
+  accessibilityLabel,
+  accessibilityHint,
 }: PrimaryButtonProps) {
   return (
     <Pressable
       onPress={onPress}
       disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel ?? label}
+      accessibilityHint={accessibilityHint}
+      accessibilityState={{ disabled }}
       style={({ pressed }) => ({
         opacity: pressed ? 0.92 : 1,
         transform: [{ scale: pressed ? 0.98 : 1 }],

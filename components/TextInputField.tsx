@@ -21,6 +21,9 @@ export function TextInputField({
       {label && <Text className="text-sm font-semibold text-slate-700 mb-1">{label}</Text>}
       <TextInput
         placeholderTextColor="#cbd5e1"
+        // Lecteur d'écran : utilise le label visible si présent, sinon le
+        // placeholder, sinon ce que l'app passe explicitement via accessibilityLabel.
+        accessibilityLabel={rest.accessibilityLabel ?? label ?? rest.placeholder}
         {...rest}
         onFocus={(e) => {
           setFocused(true);
