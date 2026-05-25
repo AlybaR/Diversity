@@ -1,6 +1,10 @@
-# Autour de l'École — Mobile App
+# Passerelle — Maquette mobile (`mobile-app/`)
 
-Application mobile **Expo React Native + NativeWind + TypeScript** pour le projet _Autour de l'École_ — outil de coordination institutionnelle entre parents élus, écoles et mairie.
+> **Statut produit (depuis 2026-05-25, étape 31)** : maquette mobile **Expo React Native** servant de **référence UX active** pour la fusion progressive vers le produit principal `web-admin/`. Plus considérée comme « pivot abandonné » : on en porte les bonnes idées (bottom navigation, annuaire parents 3 onglets, etc.) au fil des étapes. Le suivi détaillé vit dans le workspace local, côté `SYNC_MOBILE_WEB.md`.
+>
+> **Pour la démo officielle Passerelle (présentation mairie)** : utiliser le repo principal [`AlybaR/passerelle-web-admin`](https://github.com/AlybaR/passerelle-web-admin), pas ce projet.
+
+Application mobile **Expo React Native + NativeWind + TypeScript** pour le projet _Passerelle_ — outil de coordination institutionnelle entre parents élus, écoles et mairie.
 
 **Baseline** : le lien direct entre parents élus, écoles et mairie.
 **Phrase produit** : aider les collectivités à intervenir avant la crise, et aider les parents élus à ne jamais repartir de zéro.

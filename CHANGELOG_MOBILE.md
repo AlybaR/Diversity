@@ -5,6 +5,27 @@ Le projet web `mockups-app/` n'est jamais modifié.
 
 ---
 
+## 2026-05-25 — Étape 22 : Statut mobile clarifié pour Passerelle
+
+### Contexte
+
+Le produit principal de démonstration est maintenant `web-admin/`, mais la maquette Expo reste une
+référence UX active pour la fusion responsive. Objectif : éviter toute ambiguïté dans le dépôt
+mobile et aligner le nom produit sur **Passerelle**.
+
+### Modifications
+
+- `README.md` renommé en "Passerelle — Maquette mobile".
+- Ajout d'un encart de statut : `mobile-app/` sert de référence UX active, pas de démo officielle.
+- Redirection claire vers le dépôt GitHub `AlybaR/passerelle-web-admin` pour la présentation mairie,
+  afin d'éviter les liens relatifs cassés dans ce dépôt mobile autonome.
+
+### Vérifications
+
+- Documentation uniquement, aucun code mobile modifié.
+
+---
+
 ## 2026-05-21 — Étape 21 : Démo Passerelle utilisable en 3-4 jours
 
 ### Contexte
